@@ -44,7 +44,7 @@ function letraImg(letra) {
 /* ══════════════════════════════════════
    NAVEGACIÓN PRINCIPAL
 ══════════════════════════════════════ */
-const tabs = ['inicio', 'diccionario', 'traductor', 'perfil'];
+const tabs = ['inicio', 'diccionario', 'traductor', 'perfil', 'juegos'];
 
 function switchTab(tab) {
   // Pausar traductor si se sale de su tab
@@ -58,25 +58,35 @@ function switchTab(tab) {
   });
   if (navigator.vibrate) navigator.vibrate(10);
   if (tab === 'diccionario') initDiccionario();
+  if (tab === 'juegos')      initJuegos();
   if (tab === 'traductor')   initTraductor && initTraductor();
 }
 
 
 /* ══════════════════════════════════════
-   DICCIONARIO — Sub-navegación
+   JUEGOS — Sub-Navegación e Inicialización
 ══════════════════════════════════════ */
-function showDicSection(section) {
-  ['abecedario', 'preguntas'].forEach(s => {
-    const btn = document.getElementById(`dic-btn-${s}`);
-    const sec = document.getElementById(`dic-${s}`);
+function showJuegoSection(section) {
+  ['adivina', 'trivia'].forEach(s => {
+    const btn = document.getElementById(`juego-btn-${s}`);
+    const sec = document.getElementById(`juego-${s}`);
     if (btn) btn.classList.toggle('active', s === section);
     if (sec) sec.classList.toggle('hidden', s !== section);
   });
-  if (section === 'preguntas') {
+  if (section === 'adivina' && quizTotal === 0) {
     quizScore = 0; quizTotal = 0;
     updateScore();
     nextQuestion();
   }
+  if (section === 'trivia' && typeof currentTriviaIndex === 'undefined') {
+    initTrivia();
+  } else if (section === 'trivia' && currentTriviaIndex === 0 && !document.getElementById('trivia-options').innerHTML.trim()) {
+    initTrivia();
+  }
+}
+
+function initJuegos() {
+  showJuegoSection('adivina');
 }
 
 /* ══════════════════════════════════════
@@ -120,6 +130,17 @@ function getRandomOptions(correct) {
 }
 
 function nextQuestion() {
+  if (quizTotal >= 100) {
+    const el = document.getElementById('quiz-score');
+    if (el) el.textContent = `¡Has completado los 100 niveles! 🎉`;
+    document.getElementById('quiz-options').innerHTML = '';
+    const signEl = document.getElementById('quiz-sign');
+    signEl.innerHTML = '<div style="font-size: 60px; line-height: 120px;">🏆</div>';
+    document.getElementById('quiz-sign-label').textContent = '¡Felicidades!';
+    document.getElementById('quiz-next').style.display = 'none';
+    return;
+  }
+  updateScore();
   quizRespondido = false;
   quizActual = abecedario[Math.floor(Math.random() * abecedario.length)];
   const options = getRandomOptions(quizActual);
@@ -181,7 +202,139 @@ function answerQuestion(letraElegida, btnEl) {
 
 function updateScore() {
   const el = document.getElementById('quiz-score');
-  if (el) el.textContent = `Puntuación: ${quizScore} / ${quizTotal}`;
+  // Se cambia el puntaje por el nivel (1 al 100)
+  const maxNiveles = 100;
+  const nivelActual = Math.min(quizTotal + 1, maxNiveles);
+  if (el) el.textContent = `NIVEL ${nivelActual}/${maxNiveles}`;
+}
+
+/* ══════════════════════════════════════
+   TRIVIA SORDA (Niveles 1 al 100)
+══════════════════════════════════════ */
+const trivias = [
+  {
+    tema: 'Mitos y Realidades 🧠',
+    pregunta: '¿Cuál es el término correcto y respetuoso en Venezuela para referirse a alguien que no oye?',
+    opciones: [
+      { texto: 'Sordomudo', correcta: false, explicacion: '¡Mito! Las personas sordas sí tienen cuerdas vocales, solo no desarrollaron el habla.' },
+      { texto: 'Persona Sorda / Sordo', correcta: true, explicacion: '¡Correcto! Es el término adecuado aceptado por la comunidad.' },
+      { texto: 'Enfermo del oído', correcta: false, explicacion: 'No es el término preferido, ya que se enfoca en la carencia.' }
+    ]
+  },
+  {
+    tema: 'Comunicación 💬',
+    pregunta: '¿Es el lenguaje de señas universal en todo el mundo?',
+    opciones: [
+      { texto: 'Sí, es igual en todos lados', correcta: false, explicacion: '¡Falso! Cada país tiene su propia lengua de señas.' },
+      { texto: 'No, varía por país', correcta: true, explicacion: '¡Correcto! Cada idioma y cultura ha desarrollado la suya propia.' },
+      { texto: 'Solo existe la Internacional', correcta: false, explicacion: 'Solo existe un sistema internacional parcial, pero no es universal.' }
+    ]
+  },
+  {
+    tema: 'Mitos y Realidades 🧠',
+    pregunta: '¿Todas las personas sordas leen los labios perfectamente?',
+    opciones: [
+      { texto: 'Sí, siempre pueden', correcta: false, explicacion: '¡Mito! Solo se capta alrededor del 30% a 40% del mensaje.' },
+      { texto: 'No, la lectoescritura es parcial', correcta: true, explicacion: '¡Correcto! Requiere un gran esfuerzo y no todos lo hacen.' },
+      { texto: 'Depende del audífono', correcta: false, explicacion: 'Falso, la lectura labial es puramente visual.' }
+    ]
+  }
+];
+
+const trivia100 = [];
+for (let i = 0; i < 100; i++) {
+  trivia100.push(trivias[i % trivias.length]); 
+}
+
+let currentTriviaIndex = 0;
+let triviaRespondida = false;
+
+function initTrivia() {
+  currentTriviaIndex = 0;
+  loadTrivia();
+}
+
+function loadTrivia() {
+  if (currentTriviaIndex >= 100) {
+    document.getElementById('trivia-score').textContent = `¡COMPLETADO!`;
+    document.getElementById('trivia-options').innerHTML = '<div style="font-size: 60px; line-height: 120px;">🏆</div>';
+    document.getElementById('trivia-question').textContent = 'Has demostrado ser un experto en Cultura Sorda.';
+    document.getElementById('trivia-next').style.display = 'none';
+    return;
+  }
+
+  const trivia = trivia100[currentTriviaIndex];
+  triviaRespondida = false;
+
+  document.getElementById('trivia-score').textContent = `NIVEL ${(currentTriviaIndex + 1)}/100`;
+  document.getElementById('trivia-topic').textContent = trivia.tema;
+  document.getElementById('trivia-question').textContent = trivia.pregunta;
+
+  const optContainer = document.getElementById('trivia-options');
+  optContainer.innerHTML = '';
+  document.getElementById('trivia-feedback').textContent = '';
+  document.getElementById('trivia-next').style.display = 'none';
+
+  trivia.opciones.forEach((opt, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'trivia-btn';
+    btn.textContent = opt.texto;
+    btn.style.background = 'rgba(255,255,255,0.06)';
+    btn.style.border = '1.5px solid rgba(106,13,173,0.35)';
+    btn.style.padding = '14px';
+    btn.style.borderRadius = '12px';
+    btn.style.fontSize = '13px';
+    btn.style.color = 'rgba(255,255,255,0.8)';
+    btn.style.fontWeight = '600';
+    btn.style.cursor = 'pointer';
+    btn.style.transition = 'all 0.2s';
+    btn.onclick = () => verificarRespuestaJuego(btn, opt.correcta, opt.explicacion);
+    optContainer.appendChild(btn);
+  });
+}
+
+function verificarRespuestaJuego(botonClickeado, esCorrecta, explicacion) {
+    if (triviaRespondida) return;
+    triviaRespondida = true;
+
+    const feedback = document.getElementById('trivia-feedback');
+    const contenedor = document.getElementById('trivia-options');
+    
+    const botones = contenedor.getElementsByTagName('button');
+    for (let b of botones) {
+        b.disabled = true;
+        b.style.opacity = "0.7";
+        b.style.cursor = "default";
+    }
+
+    if (esCorrecta) {
+        botonClickeado.style.backgroundColor = "rgba(76, 175, 80, 0.2)"; 
+        botonClickeado.style.color = "#4caf50";
+        botonClickeado.style.borderColor = "#4caf50";
+        botonClickeado.style.opacity = "1"; 
+        
+        feedback.innerText = "🎉 " + explicacion;
+        feedback.style.color = "#4caf50";
+        
+        if ("vibrate" in navigator) navigator.vibrate([100, 50, 100]); 
+    } else {
+        botonClickeado.style.backgroundColor = "rgba(244, 67, 54, 0.2)"; 
+        botonClickeado.style.color = "#f44336";
+        botonClickeado.style.borderColor = "#f44336";
+        botonClickeado.style.opacity = "1";
+        
+        feedback.innerText = "❌ " + explicacion;
+        feedback.style.color = "#f44336";
+        
+        if ("vibrate" in navigator) navigator.vibrate(2000); 
+    }
+    
+    document.getElementById('trivia-next').style.display = 'block';
+}
+
+function nextTrivia() {
+  currentTriviaIndex++;
+  loadTrivia();
 }
 
 /* ══════════════════════════════════════

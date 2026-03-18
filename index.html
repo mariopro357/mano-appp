@@ -96,15 +96,7 @@
             <p class="inicio-tagline">Explora y aprende lengua de señas</p>
           </div>
 
-          <!-- Sub-Navegación -->
-          <div class="dic-subnav">
-            <button class="dic-subnav-btn active" id="dic-btn-abecedario" onclick="showDicSection('abecedario')">
-              📋 Abecedario
-            </button>
-            <button class="dic-subnav-btn" id="dic-btn-preguntas" onclick="showDicSection('preguntas')">
-              ❓ Preguntas
-            </button>
-          </div>
+
 
           <!-- ── Vista: Abecedario ── -->
           <div class="dic-section" id="dic-abecedario">
@@ -112,8 +104,30 @@
             <div class="abc-grid" id="abc-grid"></div>
           </div>
 
-          <!-- ── Vista: Preguntas ── -->
-          <div class="dic-section hidden" id="dic-preguntas">
+        </div>
+
+        <!-- ══════════════════════════════ -->
+        <!--        SECCIÓN: JUEGOS         -->
+        <!-- ══════════════════════════════ -->
+        <div class="screen-content hidden" id="content-juegos">
+          
+          <div class="screen-header">
+            <h1 class="screen-title">Juegos</h1>
+            <p class="inicio-tagline">Diviértete y aprende jugando</p>
+          </div>
+
+          <!-- Sub-Navegación Juegos -->
+          <div class="dic-subnav">
+            <button class="dic-subnav-btn active" id="juego-btn-adivina" onclick="showJuegoSection('adivina')">
+              👀 Adivina la Seña
+            </button>
+            <button class="dic-subnav-btn" id="juego-btn-trivia" onclick="showJuegoSection('trivia')">
+              🧠 Trivia Sorda
+            </button>
+          </div>
+
+          <!-- ── Vista: Adivina la Seña ── -->
+          <div class="dic-section" id="juego-adivina">
             <div class="quiz-box">
               <p class="quiz-instruction">¿Cuál letra representa esta seña?</p>
               <div class="quiz-sign" id="quiz-sign"></div>
@@ -121,10 +135,30 @@
               <div class="quiz-options" id="quiz-options"></div>
               <div class="quiz-feedback" id="quiz-feedback"></div>
               <button class="quiz-next-btn" id="quiz-next" onclick="nextQuestion()" style="display:none">
-                Siguiente →
+                Siguiente Nivel →
               </button>
             </div>
-            <p class="quiz-score-text" id="quiz-score">Puntuación: 0 / 0</p>
+            <p class="quiz-score-text" id="quiz-score">Nivel 1/100</p>
+          </div>
+
+          <!-- ── Vista: Trivia Sorda ── -->
+          <div class="dic-section hidden" id="juego-trivia">
+              <div class="quiz-box" style="background-color: rgba(255, 255, 255, 0.04); padding: 25px; border-radius: 20px; border: 1px solid rgba(106, 13, 173, 0.35); margin: 0 auto; text-align: center; width: 100%; box-sizing: border-box;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                      <span style="font-size: 11px; color: rgba(255,255,255,0.4); font-weight: bold; letter-spacing: 0.5px;">TRIVIA SORDA</span>
+                      <span id="trivia-score" style="background-color: rgba(168,85,247,0.15); color: #d8b4fe; border: 1px solid rgba(168,85,247,0.3); padding: 5px 10px; border-radius: 20px; font-size: 11px; font-weight: bold;">NIVEL 1/100</span>
+                  </div>
+                  <h2 id="trivia-topic" style="margin-top: 0; color: #fff; font-size: 18px; margin-bottom: 15px;">Cargando...</h2>
+                  <div style="background-color: rgba(106, 13, 173, 0.15); border-radius: 12px; padding: 16px; margin-bottom: 20px; border: 1px solid rgba(106, 13, 173, 0.3);">
+                      <p id="trivia-question" style="font-size: 14px; color: rgba(255,255,255,0.9); font-weight: 600; margin: 0; line-height: 1.5;"></p>
+                  </div>
+                  <div style="display: flex; flex-direction: column; gap: 10px;" id="trivia-options">
+                  </div>
+                  <p id="trivia-feedback" style="margin-top: 15px; font-weight: 600; font-size: 13px; min-height: 38px; color: #fff;"></p>
+                  <button class="quiz-next-btn" id="trivia-next" onclick="nextTrivia()" style="display:none; margin-top: 10px;">
+                      Siguiente Nivel →
+                  </button>
+              </div>
           </div>
 
         </div>
@@ -179,6 +213,26 @@
           <!-- Info -->
           <p class="trn-current-text" id="trn-current-text">Presiona ▶ para traducir letra por letra</p>
 
+          <!-- Tarjeta de Asistente de Voz (Añadida por el usuario) -->
+          <div style="background-color: rgba(255, 255, 255, 0.04); padding: 20px; border-radius: 14px; border: 1px solid rgba(106, 13, 173, 0.35); max-width: 400px; margin: 20px auto; text-align: center; width: 100%; box-sizing: border-box;">
+              <h3 style="margin-top: 0; color: #fff; font-size: 15px; letter-spacing: 0.4px; text-transform: uppercase;">🔊 Asistente de Voz</h3>
+              <p style="color: rgba(255, 255, 255, 0.68); font-size: 11px; margin-bottom: 15px; line-height: 1.5;">Escribe un mensaje y el teléfono lo dirá por ti.</p>
+
+              <textarea id="texto-a-leer" rows="3" placeholder="Escribe aquí lo que quieres decir..." style="width: 100%; box-sizing: border-box; padding: 12px; border-radius: 14px; border: 1.5px solid rgba(106, 13, 173, 0.45); font-size: 13px; margin-bottom: 15px; resize: none; color: #fff; background: rgba(255,255,255,0.05); font-family: 'Inter', sans-serif;"></textarea>
+
+              <button onclick="hablarTexto(); vibrarExito();" style="background: linear-gradient(135deg, #3a0070, #7c3aed); color: white; border: 1.5px solid rgba(255,255,255,0.12); padding: 12px 20px; font-size: 13px; border-radius: 12px; width: 100%; font-weight: 600; margin-bottom: 15px; cursor: pointer; box-shadow: 0 4px 14px rgba(74,0,130,0.45);">
+                  📢 Hablar en voz alta
+              </button>
+
+              <div style="display: flex; gap: 10px; justify-content: center;">
+                  <button onclick="hablarFraseRapida('Hola, ¿cómo estás?'); vibrarExito();" style="background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.7); border: 1.5px solid rgba(106,13,173,0.35); padding: 10px; border-radius: 12px; font-size: 13px; font-weight: 600; flex: 1; cursor: pointer;">
+                      👋 Hola
+                  </button>
+                  <button onclick="hablarFraseRapida('Por favor, necesito ayuda'); vibrarError();" style="background: rgba(239,68,68,0.05); color: rgba(248,113,113,0.85); border: 1.5px solid rgba(239,68,68,0.3); padding: 10px; border-radius: 12px; font-size: 13px; font-weight: 600; flex: 1; cursor: pointer;">
+                      🚨 Ayuda
+                  </button>
+              </div>
+          </div>
 
         </div>
         <div class="screen-content hidden" id="content-perfil">
@@ -294,6 +348,16 @@
           <span class="nav-label">Perfil</span>
         </button>
 
+        <!-- Juegos -->
+        <button class="nav-item" id="btn-juegos" onclick="switchTab('juegos')">
+          <div class="nav-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 7H8v3H6v-3H3v-2h3V8h2v3h3v2zm4.5 2c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm3-3c-.83 0-1.5-.67-1.5-1.5S17.67 9 18.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
+            </svg>
+          </div>
+          <span class="nav-label">Juegos</span>
+        </button>
+
       </nav>
     </div>
     </div>
@@ -301,5 +365,96 @@
 
   <script src="logistica/app.js"></script>
   <script src="logistica/traductor.js"></script>
+  
+  <script>
+    // Función para leer lo que el usuario escribió en la caja de texto
+    function hablarTexto() {
+        const texto = document.getElementById('texto-a-leer').value;
+        if (texto.trim() === "") {
+            alert("Por favor, escribe algo primero.");
+            return;
+        }
+        reproducirVoz(texto);
+    }
+
+    // Función para los botones rápidos
+    function hablarFraseRapida(frase) {
+        // También ponemos la frase en la caja de texto para que el usuario vea qué se dijo
+        document.getElementById('texto-a-leer').value = frase; 
+        reproducirVoz(frase);
+    }
+
+    // El motor principal de Inteligencia Artificial de voz del navegador
+    function reproducirVoz(texto) {
+        if ('speechSynthesis' in window) {
+            // Cancelamos si estaba leyendo algo antes para que no se pisen las voces
+            window.speechSynthesis.cancel(); 
+
+            const mensaje = new SpeechSynthesisUtterance(texto);
+            
+            // Le decimos que hable en español
+            mensaje.lang = 'es-ES'; 
+            
+            // Ajustamos la velocidad (1 es normal, 0.8 es un poquito más lento y claro)
+            mensaje.rate = 0.9; 
+            
+            window.speechSynthesis.speak(mensaje);
+        } else {
+            alert("Lo siento, tu navegador o teléfono no soporta la lectura de voz.");
+        }
+    }
+
+    // --- SISTEMA DE VIBRACIÓN INTELIGENTE ---
+    function vibrarExito() {
+        if ("vibrate" in navigator) {
+            // Vibra doble (Corto-Pausa-Corto)
+            navigator.vibrate([100, 50, 100]); 
+        }
+    }
+
+    function vibrarError() {
+        if ("vibrate" in navigator) {
+            // Vibra largo (2 segundos)
+            navigator.vibrate(2000);
+        }
+    }
+
+    // ==========================================
+    // LÓGICA DE LA TRIVIA EDUCATIVA
+    // ==========================================
+    function verificarRespuesta(botonClickeado, estado, explicacion, contenedorId, feedbackId) {
+        const feedback = document.getElementById(feedbackId);
+        const contenedor = document.getElementById(contenedorId);
+        
+        // Bloqueamos todos los botones después de responder
+        const botones = contenedor.getElementsByTagName('button');
+        for (let b of botones) {
+            b.disabled = true;
+            b.style.opacity = "0.7";
+            b.style.cursor = "default";
+        }
+
+        if (estado === 'correcta') {
+            botonClickeado.style.backgroundColor = "rgba(76, 175, 80, 0.2)"; 
+            botonClickeado.style.color = "#4caf50";
+            botonClickeado.style.borderColor = "#4caf50";
+            botonClickeado.style.opacity = "1"; 
+            
+            feedback.innerText = "🎉 " + explicacion;
+            feedback.style.color = "#4caf50";
+            
+        } else {
+            botonClickeado.style.backgroundColor = "rgba(244, 67, 54, 0.2)"; 
+            botonClickeado.style.color = "#f44336";
+            botonClickeado.style.borderColor = "#f44336";
+            botonClickeado.style.opacity = "1";
+            
+            feedback.innerText = "❌ " + explicacion;
+            feedback.style.color = "#f44336";
+        }
+    }
+        }
+    }
+  </script>
 </body>
 </html>
