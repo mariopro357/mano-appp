@@ -33,28 +33,35 @@ html, body {
   position: relative;
 }
 
-/* ─── Fondo de Sábana de Seda Global (Violeta Oscuro) ─── */
+/* ─── Fondo de Sábana de Seda Global (Violeta Oscuro con Relieve) ─── */
 body::before {
   content: '';
   position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
+  top: -10%; left: -10%;
+  width: 120%; height: 120%;
   background: 
-    radial-gradient(ellipse at 35% 25%, rgba(95, 30, 150, 0.15) 0%, transparent 45%),
-    radial-gradient(ellipse at 75% 65%, rgba(60, 10, 90, 0.1) 0%, transparent 45%),
-    linear-gradient(135deg, #05010a 0%, #160824 40%, #030008 80%);
-  filter: blur(25px);
-  animation: waveSilkGlobal 15s ease-in-out infinite alternate;
+    /* Sombras oscuras imitando pliegues profundos */
+    repeating-linear-gradient(45deg, #000 0%, rgba(0,0,0,0) 10%, #000 20%),
+    /* Brillos violetas imitando zonas iluminadas de la seda */
+    repeating-linear-gradient(-35deg, rgba(60,10,90,0.1) 0%, rgba(120,30,170,0.3) 15%, rgba(60,10,90,0.1) 30%),
+    /* Color base profundo */
+    radial-gradient(circle at 50% 50%, #1e0930 0%, #04010a 100%);
+  background-size: 150vw 150vh, 120vw 120vh, 100% 100%;
+  filter: blur(25px) contrast(1.5);
+  animation: moveSilkFolds 12s infinite alternate ease-in-out;
   pointer-events: none;
   z-index: -1;
 }
 
-@keyframes waveSilkGlobal {
-  0%   { transform: rotate(0deg) scale(1) translateX(0); }
-  50%  { transform: rotate(8deg) scale(1.15) translateX(-3%); }
-  100% { transform: rotate(-5deg) scale(1.05) translateX(3%); }
+@keyframes moveSilkFolds {
+  0% { 
+    background-position: 0% 0%, 0% 0%, 50% 50%;
+    transform: scale(1) rotate(0deg);
+  }
+  100% { 
+    background-position: 50% 50%, -30% -30%, 50% 50%;
+    transform: scale(1.05) rotate(2deg);
+  }
 }
 
 /* ─── Simulador de teléfono ─── */
