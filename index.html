@@ -234,6 +234,22 @@
               </div>
           </div>
 
+          <!-- Tarjeta de Transcriptor en Vivo (Añadida por el usuario) -->
+          <div style="background-color: rgba(255, 255, 255, 0.04); padding: 20px; border-radius: 14px; border: 1px solid rgba(76, 175, 80, 0.35); max-width: 400px; margin: 20px auto 30px; text-align: center; width: 100%; box-sizing: border-box;">
+              <h3 style="margin-top: 0; color: #fff; font-size: 15px; letter-spacing: 0.4px; text-transform: uppercase;">🎙️ Transcriptor en Vivo</h3>
+              <p style="color: rgba(255, 255, 255, 0.68); font-size: 11px; margin-bottom: 15px; line-height: 1.5;">El oyente habla, la persona sorda lee.</p>
+
+              <button id="btn-escuchar" onclick="iniciarEscucha(); vibrarExito();" style="background: linear-gradient(135deg, #1b5e20, #4caf50); color: white; border: 1.5px solid rgba(255,255,255,0.12); padding: 12px 20px; font-size: 13px; border-radius: 12px; width: 100%; font-weight: 600; margin-bottom: 15px; cursor: pointer; box-shadow: 0 4px 14px rgba(76, 175, 80, 0.25); transition: 0.3s;">
+                  🎤 Toca para escuchar al oyente
+              </button>
+
+              <div style="background: rgba(0,0,0,0.2); padding: 20px; border-radius: 12px; border: 1.5px dashed rgba(76, 175, 80, 0.5); min-height: 80px; display: flex; align-items: center; justify-content: center;">
+                  <p id="texto-escuchado" style="font-size: 20px; font-weight: 800; color: #fff; margin: 0; text-transform: uppercase; letter-spacing: 0.5px;">
+                      ...
+                  </p>
+              </div>
+          </div>
+
         </div>
         <div class="screen-content hidden" id="content-perfil">
 
@@ -414,6 +430,58 @@
         if ("vibrate" in navigator) {
             // Vibra largo (2 segundos)
             navigator.vibrate(2000);
+        }
+    }
+
+    // ==========================================
+    // LÓGICA DEL TRANSCRIPTOR (VOZ A TEXTO)
+    // ==========================================
+    function iniciarEscucha() {
+        const btnEscuchar = document.getElementById('btn-escuchar');
+        const textoEscuchado = document.getElementById('texto-escuchado');
+        
+        // Llamamos a la Inteligencia Artificial de voz del navegador
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        
+        if (SpeechRecognition) {
+            const reconocimiento = new SpeechRecognition();
+            reconocimiento.lang = 'es-VE'; // Español de Venezuela
+            reconocimiento.continuous = false; // Escucha una sola frase
+            
+            // Cuando empieza a escuchar
+            reconocimiento.onstart = function() {
+                textoEscuchado.innerText = "Escuchando...";
+                textoEscuchado.style.color = "#ffb74d"; // Naranja claro
+                btnEscuchar.style.background = "linear-gradient(135deg, #e65100, #ff9800)"; 
+                btnEscuchar.innerText = "Escuchando... Habla ya";
+            };
+            
+            // Cuando termina y reconoce lo que dijiste
+            reconocimiento.onresult = function(evento) {
+                // Saca el texto y lo pone en mayúsculas gigantes
+                const transcripcion = evento.results[0][0].transcript;
+                textoEscuchado.innerText = transcripcion; 
+                textoEscuchado.style.color = "#81c784"; // Verde claro
+                
+                // Vuelve el botón a la normalidad
+                btnEscuchar.style.background = "linear-gradient(135deg, #1b5e20, #4caf50)"; 
+                btnEscuchar.innerText = "🎤 Toca para escuchar de nuevo";
+                vibrarExito(); // Vibra doble para avisar que ya transcribió
+            };
+            
+            // Si hay un error (no escuchó nada o hay ruido)
+            reconocimiento.onerror = function(evento) {
+                textoEscuchado.innerText = "NO TE ESCUCHÉ. INTENTA DE NUEVO.";
+                textoEscuchado.style.color = "#e57373"; // Rojo claro
+                btnEscuchar.style.background = "linear-gradient(135deg, #1b5e20, #4caf50)";
+                btnEscuchar.innerText = "🎤 Toca para escuchar al oyente";
+                vibrarError(); // Vibra largo indicando error
+            };
+            
+            reconocimiento.start();
+        } else {
+            textoEscuchado.innerText = "TU NAVEGADOR NO SOPORTA EL MICRÓFONO WEB.";
+            textoEscuchado.style.color = "#e57373";
         }
     }
 
