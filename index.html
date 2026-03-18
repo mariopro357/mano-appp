@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Mano App</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="diseño/style.css" />
+</head>
+<body>
+
+  <!-- Simulador de pantalla móvil -->
+  <div class="phone-wrapper">
+    <div class="phone-frame">
+
+      <!-- Pantalla principal -->
+      <div class="screen" id="main-screen">
+
+        <!-- Marca de agua -->
+        <div class="watermark">MANO</div>
+
+        <!-- ══════════════════════════════ -->
+        <!--        SECCIÓN: INICIO         -->
+        <!-- ══════════════════════════════ -->
+        <div class="screen-content" id="content-inicio">
+
+          <!-- Encabezado -->
+          <div class="screen-header">
+            <div class="inicio-logo-row">
+              <span class="inicio-logo-icon">🤟</span>
+              <h1 class="screen-title">Mano</h1>
+            </div>
+            <p class="inicio-tagline">Lengua de Señas al alcance de todos</p>
+          </div>
+
+          <!-- Divider -->
+          <div class="inicio-divider"></div>
+
+          <!-- Bloque 1: ¿Qué es Mano? -->
+          <div class="info-card">
+            <div class="info-card-header">
+              <span class="info-card-icon">📖</span>
+              <span class="info-card-title">¿Qué es Mano?</span>
+            </div>
+            <p class="info-card-text">
+              Mano es una aplicación de traductor y enseñanza de lengua de señas,
+              especializada en ayudar a personas que les cuesta aprender o simplemente
+              para uso en su determinado tiempo libre.
+            </p>
+          </div>
+
+          <!-- Bloque 2: Nuestra misión -->
+          <div class="info-card">
+            <div class="info-card-header">
+              <span class="info-card-icon">🌐</span>
+              <span class="info-card-title">Nuestra Misión</span>
+            </div>
+            <p class="info-card-text">
+              Esta aplicación busca facilitar la comunicación entre personas con
+              problemas en el habla y la escucha, promoviendo la inclusión y el
+              acceso igualitario a la información para toda la comunidad.
+            </p>
+          </div>
+
+          <!-- Bloque 3: ¿Cómo funciona? -->
+          <div class="info-card">
+            <div class="info-card-header">
+              <span class="info-card-icon">✋</span>
+              <span class="info-card-title">¿Cómo funciona?</span>
+            </div>
+            <p class="info-card-text">
+              A través de sus módulos de <strong>traducción</strong> y
+              <strong>diccionario de señas</strong>, Mano convierte texto o voz en
+              representaciones visuales de señas, haciendo que cada interacción
+              sea más accesible, clara y humana.
+            </p>
+          </div>
+
+          <!-- Pie de sección -->
+          <p class="inicio-footer-note">
+            Versión 1.0 · © 2026 Mano App. Todos los derechos reservados.
+          </p>
+
+        </div>
+
+        <!-- ══════════════════════════════ -->
+        <!--      SECCIÓN: DICCIONARIO      -->
+        <!-- ══════════════════════════════ -->
+        <div class="screen-content hidden" id="content-diccionario">
+
+          <!-- Encabezado Diccionario -->
+          <div class="screen-header">
+            <h1 class="screen-title">Diccionario</h1>
+            <p class="inicio-tagline">Explora y aprende lengua de señas</p>
+          </div>
+
+          <!-- Sub-Navegación -->
+          <div class="dic-subnav">
+            <button class="dic-subnav-btn active" id="dic-btn-abecedario" onclick="showDicSection('abecedario')">
+              📋 Abecedario
+            </button>
+            <button class="dic-subnav-btn" id="dic-btn-preguntas" onclick="showDicSection('preguntas')">
+              ❓ Preguntas
+            </button>
+          </div>
+
+          <!-- ── Vista: Abecedario ── -->
+          <div class="dic-section" id="dic-abecedario">
+            <p class="dic-section-hint">Toca cada letra para ver su seña</p>
+            <div class="abc-grid" id="abc-grid"></div>
+          </div>
+
+          <!-- ── Vista: Preguntas ── -->
+          <div class="dic-section hidden" id="dic-preguntas">
+            <div class="quiz-box">
+              <p class="quiz-instruction">¿Cuál letra representa esta seña?</p>
+              <div class="quiz-sign" id="quiz-sign"></div>
+              <p class="quiz-sign-label" id="quiz-sign-label">Seña</p>
+              <div class="quiz-options" id="quiz-options"></div>
+              <div class="quiz-feedback" id="quiz-feedback"></div>
+              <button class="quiz-next-btn" id="quiz-next" onclick="nextQuestion()" style="display:none">
+                Siguiente →
+              </button>
+            </div>
+            <p class="quiz-score-text" id="quiz-score">Puntuación: 0 / 0</p>
+          </div>
+
+        </div>
+
+        <!-- ══════════════════════════════ -->
+        <!--  SECCIÓN: TRADUCTOR / PERFIL  -->
+        <!-- ══════════════════════════════ -->
+        <div class="screen-content hidden" id="content-traductor">
+
+          <!-- Encabezado -->
+          <div class="screen-header">
+            <h1 class="screen-title">Traductor</h1>
+            <p class="trn-subtitle">Escribe y ve las señas</p>
+          </div>
+
+          <!-- Campo de texto -->
+          <div class="trn-input-wrap">
+            <textarea
+              id="trn-input"
+              class="trn-textarea"
+              placeholder="Escribe aquí..."
+              maxlength="60"
+              oninput="onTrnInput()"
+              rows="2"
+            ></textarea>
+            <div class="trn-input-actions">
+              <span class="trn-charcount" id="trn-charcount">0/60</span>
+              <button class="trn-clear-input" onclick="clearTrn()" title="Limpiar">×</button>
+            </div>
+          </div>
+
+          <!-- Visor de seña animada -->
+          <div class="trn-viewer">
+            <div class="trn-sign-stage">
+              <!-- Imagen de la letra actual (carpeta letras/) -->
+              <img id="trn-pantalla"
+                   src="letras/espacio.jpg"
+                   alt="Seña"
+                   class="trn-pantalla-img" />
+            </div>
+            <!-- Letra que se está mostrando -->
+            <div class="trn-sign-letter" id="trn-sign-letter"></div>
+          </div>
+
+          <!-- Botón Traducir -->
+          <div class="trn-controls">
+            <button class="trn-play-btn" id="trn-play" onclick="trnTogglePlay()">
+              <span id="trn-play-icon">▶</span>
+            </button>
+          </div>
+
+          <!-- Info -->
+          <p class="trn-current-text" id="trn-current-text">Presiona ▶ para traducir letra por letra</p>
+
+
+        </div>
+        <div class="screen-content hidden" id="content-perfil">
+
+          <!-- Avatar circular -->
+          <div class="prf-avatar-wrap">
+            <div class="prf-avatar">
+              <span class="prf-avatar-text">mano</span>
+            </div>
+            <button class="prf-avatar-edit" title="Cambiar foto">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M15.232 5.232l3.536 3.536M9 13l6.5-6.5M3 21h3.75L17 10.75 13.25 7 3 17.25V21z"/>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Formulario de perfil -->
+          <div class="prf-form">
+
+            <div class="prf-field">
+              <label class="prf-label">Nombre</label>
+              <input type="text" id="prf-nombre" class="prf-input" placeholder="Tu nombre" maxlength="30" />
+            </div>
+
+            <div class="prf-field">
+              <label class="prf-label">Apellido</label>
+              <input type="text" id="prf-apellido" class="prf-input" placeholder="Tu apellido" maxlength="30" />
+            </div>
+
+            <div class="prf-field">
+              <label class="prf-label">Lugar</label>
+              <input type="text" id="prf-lugar" class="prf-input" placeholder="Ciudad, País" maxlength="40" />
+            </div>
+
+            <!-- Botones principales -->
+            <div class="prf-btn-row">
+              <button class="prf-btn prf-btn-edit" id="prf-btn-edit" onclick="prfEdit()">
+                ✏️ Editar
+              </button>
+              <button class="prf-btn prf-btn-save" id="prf-btn-save" onclick="prfSave()" disabled>
+                💾 Guardar
+              </button>
+            </div>
+
+            <!-- Separador -->
+            <div class="prf-separator"></div>
+
+            <!-- Cerrar sesión -->
+            <button class="prf-btn prf-btn-logout" onclick="prfLogout()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;vertical-align:middle;margin-right:6px">
+                <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h6a2 2 0 012 2v1"/>
+              </svg>
+              Cerrar sesión
+            </button>
+
+          </div>
+
+          <!-- Versión -->
+          <p class="prf-version">MANO App · v1.0</p>
+
+        </div>
+
+
+      </div>
+
+      <!-- Barra de herramientas inferior -->
+      <nav class="bottom-nav">
+
+        <!-- Inicio -->
+        <button class="nav-item active" id="btn-inicio" onclick="switchTab('inicio')">
+          <div class="nav-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+            </svg>
+          </div>
+          <span class="nav-label">Inicio</span>
+        </button>
+
+        <!-- Diccionario -->
+        <button class="nav-item" id="btn-diccionario" onclick="switchTab('diccionario')">
+          <div class="nav-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M18 2h-3a5 5 0 0 0-5 5v6H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" fill="none" stroke="currentColor" stroke-width="2"/>
+            </svg>
+          </div>
+          <span class="nav-label">Diccionario</span>
+        </button>
+
+        <!-- Traductor -->
+        <button class="nav-item" id="btn-traductor" onclick="switchTab('traductor')">
+          <div class="nav-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m5 8 6 6"/>
+              <path d="m4 14 6-6 2-3"/>
+              <path d="M2 5h12"/>
+              <path d="M7 2h1"/>
+              <path d="m22 22-5-10-5 10"/>
+              <path d="M14 18h6"/>
+            </svg>
+          </div>
+          <span class="nav-label">Traductor</span>
+        </button>
+
+        <!-- Perfil -->
+        <button class="nav-item" id="btn-perfil" onclick="switchTab('perfil')">
+          <div class="nav-icon profile-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
+            </svg>
+          </div>
+          <span class="nav-label">Perfil</span>
+        </button>
+
+      </nav>
+    </div>
+    </div>
+  </div>
+
+  <script src="logistica/app.js"></script>
+  <script src="logistica/traductor.js"></script>
+</body>
+</html>
