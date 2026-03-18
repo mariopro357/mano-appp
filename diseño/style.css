@@ -24,12 +24,37 @@
 html, body {
   width: 100%;
   height: 100%;
-  background: #0a0010;
+  background: #08000f; /* Fondo profundo base */
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: 'Inter', sans-serif;
   overflow: hidden;
+  position: relative;
+}
+
+/* ─── Fondo de Sábana de Seda Global (Violeta Oscuro) ─── */
+body::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: 
+    radial-gradient(ellipse at 35% 25%, rgba(95, 30, 150, 0.15) 0%, transparent 45%),
+    radial-gradient(ellipse at 75% 65%, rgba(60, 10, 90, 0.1) 0%, transparent 45%),
+    linear-gradient(135deg, #05010a 0%, #160824 40%, #030008 80%);
+  filter: blur(25px);
+  animation: waveSilkGlobal 15s ease-in-out infinite alternate;
+  pointer-events: none;
+  z-index: -1;
+}
+
+@keyframes waveSilkGlobal {
+  0%   { transform: rotate(0deg) scale(1) translateX(0); }
+  50%  { transform: rotate(8deg) scale(1.15) translateX(-3%); }
+  100% { transform: rotate(-5deg) scale(1.05) translateX(3%); }
 }
 
 /* ─── Simulador de teléfono ─── */
@@ -39,55 +64,35 @@ html, body {
   justify-content: center;
   width: 100vw;
   height: 100vh;
+  position: relative;
+  z-index: 10;
 }
 
 .phone-frame {
   position: relative;
   width: 390px;
   height: 844px;
-  background: var(--black);
+  background: rgba(5, 5, 5, 0.6); /* Transparente para dejar pasar la sábana exterior */
+  backdrop-filter: blur(15px);
   border-radius: 48px;
   overflow: hidden;
   box-shadow:
-    0 0 0 2px #2a2a2a,
-    0 0 0 4px #1a1a1a,
+    0 0 0 2px rgba(255,255,255,0.03),
+    0 0 0 4px rgba(0,0,0,0.8),
     0 40px 80px rgba(0, 0, 0, 0.8),
-    0 0 60px var(--purple-glow);
+    0 0 80px rgba(106, 13, 173, 0.25);
   display: flex;
   flex-direction: column;
 }
 
-/* ─── Pantalla (Fondo de Sábana) ─── */
+/* ─── Pantalla ─── */
 .screen {
   flex: 1;
   position: relative;
-  background: #050505;
+  background: transparent;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-}
-
-.screen::before {
-  content: '';
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: 
-    radial-gradient(ellipse at 40% 30%, rgba(255,255,255,0.08) 0%, transparent 50%),
-    radial-gradient(ellipse at 70% 60%, rgba(255,255,255,0.05) 0%, transparent 50%),
-    linear-gradient(135deg, #000 0%, #151515 40%, #0a0a0a 80%);
-  filter: blur(15px);
-  animation: waveSilk 12s ease-in-out infinite alternate;
-  pointer-events: none;
-  z-index: 0;
-}
-
-@keyframes waveSilk {
-  0%   { transform: rotate(0deg) scale(1) translateX(0); }
-  50%  { transform: rotate(10deg) scale(1.15) translateX(-3%); }
-  100% { transform: rotate(-5deg) scale(1.05) translateX(3%); }
 }
 
 /* ─── Marca de agua animada ─── */
@@ -98,7 +103,7 @@ html, body {
   font-size: 130px;
   font-weight: 900;
   letter-spacing: 25px;
-  color: rgba(255, 255, 255, 0.15); /* Blanco translúcido suave */
+  color: rgba(255, 255, 255, 0.15); /* El "MANO" será blanco transparente y ondulará */
   user-select: none;
   pointer-events: none;
   white-space: nowrap;
