@@ -386,21 +386,19 @@
 
     // El motor principal de Inteligencia Artificial de voz del navegador
     function reproducirVoz(texto) {
-        if ('speechSynthesis' in window) {
-            // Cancelamos si estaba leyendo algo antes para que no se pisen las voces
+        // 1. Primero intenta usar el puente nativo de Android (A prueba de balas)
+        if (typeof AndroidTTS !== "undefined") {
+            AndroidTTS.hablar(texto);
+        } 
+        // 2. Si fallara o si abren la página desde una PC normal, usa el de la web
+        else if ('speechSynthesis' in window) {
             window.speechSynthesis.cancel(); 
-
             const mensaje = new SpeechSynthesisUtterance(texto);
-            
-            // Le decimos que hable en español
             mensaje.lang = 'es-ES'; 
-            
-            // Ajustamos la velocidad (1 es normal, 0.8 es un poquito más lento y claro)
             mensaje.rate = 0.9; 
-            
             window.speechSynthesis.speak(mensaje);
         } else {
-            alert("Lo siento, tu navegador o teléfono no soporta la lectura de voz.");
+            alert("Tu dispositivo no soporta la lectura de voz.");
         }
     }
 
