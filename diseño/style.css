@@ -57,31 +57,62 @@ html, body {
   flex-direction: column;
 }
 
-/* ─── Pantalla ─── */
+/* ─── Pantalla (Fondo de Sábana) ─── */
 .screen {
   flex: 1;
   position: relative;
-  background: var(--black);
+  background: #050505;
   overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 
-/* ─── Marca de agua ─── */
+.screen::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: 
+    radial-gradient(ellipse at 40% 30%, rgba(255,255,255,0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 70% 60%, rgba(255,255,255,0.05) 0%, transparent 50%),
+    linear-gradient(135deg, #000 0%, #151515 40%, #0a0a0a 80%);
+  filter: blur(15px);
+  animation: waveSilk 12s ease-in-out infinite alternate;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes waveSilk {
+  0%   { transform: rotate(0deg) scale(1) translateX(0); }
+  50%  { transform: rotate(10deg) scale(1.15) translateX(-3%); }
+  100% { transform: rotate(-5deg) scale(1.05) translateX(3%); }
+}
+
+/* ─── Marca de agua animada ─── */
 .watermark {
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 120px;
-  font-weight: 800;
-  letter-spacing: 20px;
-  color: rgba(255, 255, 255, 0.045);
+  font-size: 130px;
+  font-weight: 900;
+  letter-spacing: 25px;
+  color: rgba(255, 255, 255, 0.15); /* Blanco translúcido suave */
   user-select: none;
   pointer-events: none;
   white-space: nowrap;
   text-transform: uppercase;
   z-index: 0;
+  animation: waveWatermark 8s ease-in-out infinite alternate;
+  text-shadow: 0 10px 40px rgba(255, 255, 255, 0.05);
+}
+
+@keyframes waveWatermark {
+  0% { transform: translate(-50%, -50%) scale(1) skewX(0deg) skewY(0deg); }
+  33% { transform: translate(-52%, -48%) scale(1.03) skewX(2deg) skewY(-1deg); }
+  66% { transform: translate(-48%, -52%) scale(0.98) skewX(-2deg) skewY(0deg); }
+  100% { transform: translate(-50%, -51%) scale(1.02) skewX(1deg) skewY(1deg); }
 }
 
 /* ─── Contenido de pantalla ─── */
