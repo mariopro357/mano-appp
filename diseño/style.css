@@ -24,45 +24,15 @@
 html, body {
   width: 100%;
   height: 100%;
-  background: #08000f; /* Fondo profundo base */
+  background: var(--black); /* Negro mate */
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: 'Inter', sans-serif;
   overflow: hidden;
-  position: relative;
 }
 
-/* ─── Fondo de Sábana de Seda Global (Violeta Oscuro con Relieve) ─── */
-body::before {
-  content: '';
-  position: absolute;
-  top: -10%; left: -10%;
-  width: 120%; height: 120%;
-  background: 
-    /* Sombras oscuras imitando pliegues profundos */
-    repeating-linear-gradient(45deg, #000 0%, rgba(0,0,0,0) 10%, #000 20%),
-    /* Brillos violetas imitando zonas iluminadas de la seda */
-    repeating-linear-gradient(-35deg, rgba(60,10,90,0.1) 0%, rgba(120,30,170,0.3) 15%, rgba(60,10,90,0.1) 30%),
-    /* Color base profundo */
-    radial-gradient(circle at 50% 50%, #1e0930 0%, #04010a 100%);
-  background-size: 150vw 150vh, 120vw 120vh, 100% 100%;
-  filter: blur(25px) contrast(1.5);
-  animation: moveSilkFolds 12s infinite alternate ease-in-out;
-  pointer-events: none;
-  z-index: -1;
-}
 
-@keyframes moveSilkFolds {
-  0% { 
-    background-position: 0% 0%, 0% 0%, 50% 50%;
-    transform: scale(1) rotate(0deg);
-  }
-  100% { 
-    background-position: 50% 50%, -30% -30%, 50% 50%;
-    transform: scale(1.05) rotate(2deg);
-  }
-}
 
 /* ─── Simulador de teléfono ─── */
 .phone-wrapper {
@@ -79,24 +49,24 @@ body::before {
   position: relative;
   width: 390px;
   height: 844px;
-  background: rgba(5, 5, 5, 0.6); /* Transparente para dejar pasar la sábana exterior */
-  backdrop-filter: blur(15px);
+  background: var(--black);
   border-radius: 48px;
   overflow: hidden;
   box-shadow:
-    0 0 0 2px rgba(255,255,255,0.03),
-    0 0 0 4px rgba(0,0,0,0.8),
-    0 40px 80px rgba(0, 0, 0, 0.8),
-    0 0 80px rgba(106, 13, 173, 0.25);
+    0 0 0 2px #2a2a2a,
+    0 0 0 4px #1a1a1a,
+    0 40px 80px rgba(0, 0, 0, 0.9),
+    0 0 100px rgba(106, 13, 173, 0.6); /* Brillo morado resaltado */
   display: flex;
   flex-direction: column;
+  border: 1px solid rgba(106, 13, 173, 0.3); /* Borde morado sutil extra */
 }
 
 /* ─── Pantalla ─── */
 .screen {
   flex: 1;
   position: relative;
-  background: transparent;
+  background: var(--black);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -107,24 +77,16 @@ body::before {
   position: absolute;
   top: 50%;
   left: 50%;
+  transform: translate(-50%, -50%);
   font-size: 130px;
   font-weight: 900;
   letter-spacing: 25px;
-  color: rgba(255, 255, 255, 0.15); /* El "MANO" será blanco transparente y ondulará */
+  color: rgba(255, 255, 255, 0.045); /* Blanco tenue mate original */
   user-select: none;
   pointer-events: none;
   white-space: nowrap;
   text-transform: uppercase;
   z-index: 0;
-  animation: waveWatermark 8s ease-in-out infinite alternate;
-  text-shadow: 0 10px 40px rgba(255, 255, 255, 0.05);
-}
-
-@keyframes waveWatermark {
-  0% { transform: translate(-50%, -50%) scale(1) skewX(0deg) skewY(0deg); }
-  33% { transform: translate(-52%, -48%) scale(1.03) skewX(2deg) skewY(-1deg); }
-  66% { transform: translate(-48%, -52%) scale(0.98) skewX(-2deg) skewY(0deg); }
-  100% { transform: translate(-50%, -51%) scale(1.02) skewX(1deg) skewY(1deg); }
 }
 
 /* ─── Contenido de pantalla ─── */
