@@ -23,6 +23,9 @@ let esperandoNueva    = false;
 let textoAcumulado = [];
 let ultimaFraseAgregada = null;
 
+// Configuración de Cámara
+let espejoFacingMode = 'user'; // 'user' (frontal) | 'environment' (trasera)
+
 /* ══════════════════════════════════════
    DEFINICIÓN DE LETRAS
 ══════════════════════════════════════ */
@@ -95,11 +98,30 @@ function initEspejo() {
     },
     width: 340,
     height: 255,
-    facingMode: 'user',
+    facingMode: espejoFacingMode,
   });
 
   espejoCamera.start();
   espejoActivo = true;
+}
+
+function espejoToggleCamara() {
+  espejoFacingMode = espejoFacingMode === 'user' ? 'environment' : 'user';
+  if (espejoActivo && espejoCamera) {
+    espejoCamera.stop();
+    const video = document.getElementById('espejo-video');
+    espejoCamera = new Camera(video, {
+      onFrame: async () => {
+        if (espejoActivo && espejoHands) {
+          await espejoHands.send({ image: video });
+        }
+      },
+      width: 340,
+      height: 255,
+      facingMode: espejoFacingMode,
+    });
+    espejoCamera.start();
+  }
 }
 
 function stopEspejo() {
@@ -126,10 +148,14 @@ function onEspejoResults(results) {
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Dibujar la imagen de video (espejada)
+  // Dibujar la imagen de video
   ctx.save();
-  ctx.scale(-1, 1);
-  ctx.drawImage(results.image, -canvas.width, 0, canvas.width, canvas.height);
+  if (espejoFacingMode === 'user') {
+    ctx.scale(-1, 1);
+    ctx.drawImage(results.image, -canvas.width, 0, canvas.width, canvas.height);
+  } else {
+    ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
+  }
   ctx.restore();
 
   if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
@@ -174,9 +200,12 @@ function onEspejoResults(results) {
   HAND_CONNECTIONS.forEach(([a, b], idx) => {
     const lmA = landmarks[a];
     const lmB = landmarks[b];
+    const xA = espejoFacingMode === 'user' ? (1 - lmA.x) : lmA.x;
+    const xB = espejoFacingMode === 'user' ? (1 - lmB.x) : lmB.x;
+
     ctx.beginPath();
-    ctx.moveTo((1 - lmA.x) * canvas.width, lmA.y * canvas.height);
-    ctx.lineTo((1 - lmB.x) * canvas.width, lmB.y * canvas.height);
+    ctx.moveTo(xA * canvas.width, lmA.y * canvas.height);
+    ctx.lineTo(xB * canvas.width, lmB.y * canvas.height);
     ctx.strokeStyle = colorDeConexion(idx);
     ctx.lineWidth   = 2.5;
     ctx.shadowColor = colorDeConexion(idx);
@@ -187,7 +216,8 @@ function onEspejoResults(results) {
 
   // ── Dibujar puntos con color por dedo ──
   landmarks.forEach((lm, i) => {
-    const x     = (1 - lm.x) * canvas.width;
+    const xDir  = espejoFacingMode === 'user' ? (1 - lm.x) : lm.x;
+    const x     = xDir * canvas.width;
     const y     = lm.y * canvas.height;
     const color = colorDeLandmark(i);
     const radio = i === 0 ? 7 : (i % 4 === 0 ? 6 : 4);  // punta de dedo más grande
