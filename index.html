@@ -8,6 +8,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="diseño/style.css" />
+  <!-- MediaPipe Hands -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 </head>
 <body>
 
@@ -311,6 +315,68 @@
 
         </div>
 
+        <!-- ══════════════════════════════ -->
+        <!--      SECCIÓN: ESPEJO IA        -->
+        <!-- ══════════════════════════════ -->
+        <div class="screen-content hidden" id="content-espejo">
+
+          <!-- Encabezado -->
+          <div class="screen-header">
+            <h1 class="screen-title">🪞 Espejo IA</h1>
+            <p class="inicio-tagline">Traduce lengua de señas en tiempo real</p>
+          </div>
+
+          <!-- Sub-Navegación -->
+          <div class="espejo-subnav">
+            <button class="espejo-subnav-btn active" id="espejo-btn-letras" onclick="showEspejoMode('letras')">
+              🔤 Letras
+            </button>
+            <button class="espejo-subnav-btn" id="espejo-btn-palabras" onclick="showEspejoMode('palabras')">
+              💬 Palabras
+            </button>
+          </div>
+
+          <!-- Cámara + Canvas -->
+          <div class="espejo-cam-wrap">
+            <video id="espejo-video" autoplay muted playsinline></video>
+            <canvas id="espejo-canvas" width="340" height="255"></canvas>
+            <div class="espejo-cam-badge">IA Activa</div>
+          </div>
+
+          <!-- ── Sección: Letras (traductor) ── -->
+          <div id="espejo-letras-section">
+            <!-- Letra grande detectada -->
+            <div class="espejo-live-letter" id="espejo-live-letter">—</div>
+            <!-- Descripción de la seña -->
+            <div class="espejo-live-desc" id="espejo-live-desc">Muestra tu mano a la cámara</div>
+          </div>
+
+          <!-- ── Sección: Palabras (traductor continuo) ── -->
+          <div id="espejo-palabras-section" class="hidden">
+            <!-- Confianza -->
+            <div class="espejo-confianza-wrap" id="espejo-confianza-wrap" style="margin-top: 0; margin-bottom: 8px;">
+              <div class="espejo-confianza-label" id="espejo-confianza-label">Confianza: 0%</div>
+              <div class="espejo-confianza-track">
+                <div class="espejo-confianza-bar" id="espejo-confianza-bar"></div>
+              </div>
+            </div>
+            <div class="espejo-live-desc" id="espejo-live-phrase-desc">Mantén la seña para agregarla a la frase...</div>
+
+            <!-- Caja de Traducción Continua -->
+            <div class="espejo-traduccion-box">
+              <div class="espejo-texto-acumulado" id="espejo-texto-acumulado">
+                <span class="espejo-placeholder">La traducción aparecerá aquí...</span>
+              </div>
+              <div class="espejo-traduccion-acciones">
+                <button class="espejo-act-btn" onclick="espejoBorrarUltima()" title="Borrar última">⌫ Borrar</button>
+                <button class="espejo-act-btn" onclick="espejoLimpiar()" title="Limpiar todo">🗑️ Limpiar</button>
+                <button class="espejo-act-btn highlight" onclick="espejoHablar()" title="Leer en voz alta">🔊 Hablar</button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
 
       </div>
 
@@ -374,6 +440,16 @@
           <span class="nav-label">Juegos</span>
         </button>
 
+        <!-- Espejo -->
+        <button class="nav-item" id="btn-espejo" onclick="switchTab('espejo')">
+          <div class="nav-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 2.61 1.41 4.88 3.5 6.15V17h7v-1.85C17.59 13.88 19 11.61 19 9c0-3.87-3.13-7-7-7zm1 13h-2v-2h2v2zm0-4h-2V7h2v4zm-1 9c.83 0 1.5-.67 1.5-1.5h-3c0 .83.67 1.5 1.5 1.5z"/>
+            </svg>
+          </div>
+          <span class="nav-label">Espejo</span>
+        </button>
+
       </nav>
     </div>
     </div>
@@ -381,6 +457,7 @@
 
   <script src="logistica/app.js"></script>
   <script src="logistica/traductor.js"></script>
+  <script src="logistica/espejo.js"></script>
   
   <script>
     // Función para leer lo que el usuario escribió en la caja de texto

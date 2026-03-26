@@ -573,11 +573,417 @@ html, body {
   font-size: 9px;
   color: rgba(255,255,255,0.15);
   text-align: center;
-  margin-top: 14px;
+  margin-top: 10px;
   letter-spacing: 0.5px;
 }
 
+/* ─── Traducción Continua (Caja y Botones) ─── */
+.espejo-traduccion-box {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  border-radius: 12px;
+  padding: 12px;
+  margin: 10px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
 
+.espejo-texto-acumulado {
+  font-family: 'Inter', sans-serif;
+  font-size: 20px;
+  color: #fff;
+  min-height: 60px;
+  max-height: 120px;
+  overflow-y: auto;
+  line-height: 1.4;
+  word-wrap: break-word;
+  padding: 4px;
+}
+
+.espejo-placeholder {
+  color: rgba(255, 255, 255, 0.3);
+  font-style: italic;
+  font-size: 16px;
+}
+
+.espejo-texto-acumulado .palabra {
+  display: inline-block;
+  background: rgba(168, 85, 247, 0.2);
+  padding: 4px 8px;
+  border-radius: 6px;
+  margin: 0 4px 4px 0;
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  animation: fadeIn 0.3s ease;
+}
+
+.espejo-traduccion-acciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.espejo-act-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 8px;
+  color: #e9d5ff;
+  font-size: 12px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.espejo-act-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.espejo-act-btn:active {
+  transform: scale(0.95);
+}
+
+.espejo-act-btn.highlight {
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  color: white;
+  font-weight: bold;
+}
+/* ─── Espejo: letra detectada grande ─── */
+.espejo-live-letter {
+  font-family: 'Inter', sans-serif;
+  font-size: 96px;
+  font-weight: 900;
+  color: rgba(255,255,255,0.1);
+  text-align: center;
+  width: 100%;
+  line-height: 1;
+  padding: 10px 0 4px;
+  letter-spacing: 4px;
+  transition: color 0.2s ease, text-shadow 0.2s ease;
+  user-select: none;
+}
+
+.espejo-live-letter.detected {
+  color: #e9d5ff;
+  text-shadow:
+    0 0 30px rgba(168,85,247,0.8),
+    0 0 60px rgba(168,85,247,0.35);
+  animation: letterPop 0.25s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+@keyframes letterPop {
+  from { transform: scale(0.8); opacity: 0.3; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+/* ─── Espejo: frase/palabra detectada ─── */
+.espejo-live-phrase {
+  font-family: 'Inter', sans-serif;
+  font-size: 26px;
+  font-weight: 800;
+  color: rgba(255,255,255,0.1);
+  text-align: center;
+  width: 100%;
+  padding: 12px 0 4px;
+  transition: color 0.25s ease, text-shadow 0.25s ease;
+  user-select: none;
+}
+
+.espejo-live-phrase.detected {
+  color: #d8b4fe;
+  text-shadow: 0 0 24px rgba(168,85,247,0.7);
+  animation: letterPop 0.3s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+/* ─── Hint / descripción ─── */
+.espejo-live-desc {
+  font-family: Arial, sans-serif;
+  font-size: 11.5px;
+  color: rgba(255,255,255,0.35);
+  text-align: center;
+  width: 100%;
+  margin-bottom: 10px;
+  min-height: 18px;
+  line-height: 1.5;
+  font-style: italic;
+  padding: 0 8px;
+}
+/* ══════════════════════════════════════
+   MODO ESPEJO CON IA
+══════════════════════════════════════ */
+#content-espejo {
+  padding: 20px 16px 16px;
+  gap: 0;
+  justify-content: flex-start;
+  align-items: center;
+  overflow-y: auto;
+}
+
+#content-espejo .screen-header {
+  margin-bottom: 14px;
+}
+
+/* ─── Sub-navegación ─── */
+.espejo-subnav {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+  margin-bottom: 14px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(106,13,173,0.3);
+  border-radius: 14px;
+  padding: 4px;
+}
+
+.espejo-subnav-btn {
+  flex: 1;
+  padding: 9px 0;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  color: rgba(255,255,255,0.45);
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.22s ease;
+}
+
+.espejo-subnav-btn.active {
+  background: linear-gradient(135deg, #3a0070, #7c3aed);
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(74,0,130,0.5);
+}
+
+/* ─── Contenedor de cámara ─── */
+.espejo-cam-wrap {
+  width: 100%;
+  position: relative;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1.5px solid rgba(168,85,247,0.5);
+  box-shadow: 0 0 30px rgba(106,13,173,0.35), inset 0 0 20px rgba(0,0,0,0.4);
+  background: #000;
+  margin-bottom: 12px;
+  aspect-ratio: 4/3;
+}
+
+#espejo-video {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  opacity: 0;
+}
+
+#espejo-canvas {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  display: block;
+}
+
+.espejo-cam-badge {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  background: rgba(106,13,173,0.75);
+  border: 1px solid rgba(168,85,247,0.5);
+  border-radius: 20px;
+  padding: 3px 10px;
+  font-family: 'Inter', sans-serif;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #e9d5ff;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  backdrop-filter: blur(6px);
+  z-index: 2;
+}
+
+.espejo-cam-badge::before {
+  content: '●';
+  color: #a855f7;
+  margin-right: 5px;
+  animation: blink 1.2s step-start infinite;
+}
+
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ─── Selector de letras ─── */
+.espejo-letters-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  width: 100%;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.espejo-letra-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(106,13,173,0.4);
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.7);
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.espejo-letra-btn:hover {
+  border-color: rgba(168,85,247,0.6);
+  background: rgba(168,85,247,0.1);
+  color: #fff;
+}
+
+.espejo-letra-btn.active {
+  background: linear-gradient(135deg, #3a0070, #7c3aed);
+  border-color: rgba(168,85,247,0.8);
+  color: #fff;
+  box-shadow: 0 0 12px rgba(168,85,247,0.45);
+  transform: scale(1.1);
+}
+
+.espejo-letra-desc {
+  font-family: Arial, sans-serif;
+  font-size: 11px;
+  color: rgba(255,255,255,0.45);
+  text-align: center;
+  margin-bottom: 10px;
+  min-height: 16px;
+  font-style: italic;
+  width: 100%;
+}
+
+/* ─── Selector de palabras ─── */
+.espejo-words-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.espejo-palabra-btn {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(106,13,173,0.35);
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.75);
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+}
+
+.espejo-palabra-btn:hover {
+  border-color: rgba(168,85,247,0.6);
+  background: rgba(168,85,247,0.08);
+  color: #fff;
+}
+
+.espejo-palabra-btn.active {
+  background: linear-gradient(135deg, rgba(58,0,112,0.8), rgba(124,58,237,0.4));
+  border-color: rgba(168,85,247,0.7);
+  color: #e9d5ff;
+  box-shadow: 0 0 14px rgba(168,85,247,0.3);
+}
+
+/* ─── Barra de confianza ─── */
+.espejo-confianza-wrap {
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.espejo-confianza-label {
+  font-family: Arial, sans-serif;
+  font-size: 9.5px;
+  color: rgba(255,255,255,0.35);
+  text-align: right;
+  margin-bottom: 4px;
+  letter-spacing: 0.3px;
+}
+
+.espejo-confianza-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(255,255,255,0.07);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.espejo-confianza-bar {
+  height: 100%;
+  width: 0%;
+  border-radius: 6px;
+  transition: width 0.25s ease, background 0.4s ease;
+  background: linear-gradient(90deg,#3a0070,#6a0dad);
+}
+
+/* ─── Resultado / Feedback ─── */
+.espejo-result {
+  width: 100%;
+  text-align: center;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.5);
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.espejo-result.ok {
+  background: rgba(76,175,80,0.12);
+  border-color: rgba(76,175,80,0.4);
+  color: #81c784;
+  box-shadow: 0 0 18px rgba(76,175,80,0.2);
+  animation: pulseOk 0.4s ease;
+}
+
+.espejo-result.err {
+  background: rgba(239,68,68,0.08);
+  border-color: rgba(239,68,68,0.35);
+  color: #f87171;
+}
+
+.espejo-result.hint {
+  color: rgba(216,180,254,0.7);
+  border-color: rgba(168,85,247,0.2);
+  background: rgba(168,85,247,0.05);
+  font-weight: 400;
+  font-size: 12px;
+  font-style: italic;
+}
+
+@keyframes pulseOk {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+
+.espejo-detected-chip {
+  font-family: 'Inter', sans-serif;
+  font-size: 10.5px;
+  color: rgba(216,180,254,0.65);
+  text-align: center;
+  margin-bottom: 6px;
+  min-height: 16px;
+  letter-spacing: 0.3px;
+  width: 100%;
+}
 
 /* ══════════════════════════════════════
    TRADUCTOR — Texto a Señas

@@ -44,11 +44,13 @@ function letraImg(letra) {
 /* ══════════════════════════════════════
    NAVEGACIÓN PRINCIPAL
 ══════════════════════════════════════ */
-const tabs = ['inicio', 'diccionario', 'traductor', 'perfil', 'juegos'];
+const tabs = ['inicio', 'diccionario', 'traductor', 'perfil', 'juegos', 'espejo'];
 
 function switchTab(tab) {
   // Pausar traductor si se sale de su tab
   if (tab !== 'traductor') stopTranslating && stopTranslating();
+  // Detener espejo si se sale de su tab
+  if (tab !== 'espejo') typeof stopEspejo === 'function' && stopEspejo();
 
   tabs.forEach(t => {
     const btn = document.getElementById(`btn-${t}`);
@@ -60,6 +62,7 @@ function switchTab(tab) {
   if (tab === 'diccionario') initDiccionario();
   if (tab === 'juegos')      initJuegos();
   if (tab === 'traductor')   initTraductor && initTraductor();
+  if (tab === 'espejo')      typeof initEspejo === 'function' && initEspejo();
 }
 
 
