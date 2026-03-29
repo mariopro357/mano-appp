@@ -772,7 +772,8 @@ html, body {
   top: 0; left: 0;
   width: 100%; height: 100%;
   object-fit: cover;
-  opacity: 0;
+  opacity: 1;                        /* Video visible a 60fps nativo */
+  transition: transform 0.3s ease;  /* Suavizar el toggle de cámara */
 }
 
 #espejo-canvas {
@@ -780,6 +781,7 @@ html, body {
   top: 0; left: 0;
   width: 100%; height: 100%;
   display: block;
+  background: transparent;           /* Canvas solo tiene el esqueleto */
 }
 
 .espejo-cam-badge {
