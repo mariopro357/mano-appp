@@ -650,15 +650,15 @@ html, body {
 /* ─── Espejo: letra detectada grande ─── */
 .espejo-live-letter {
   font-family: 'Inter', sans-serif;
-  font-size: 96px;
+  font-size: 58px;
   font-weight: 900;
   color: rgba(255,255,255,0.1);
   text-align: center;
   width: 100%;
   line-height: 1;
-  padding: 10px 0 4px;
-  letter-spacing: 4px;
-  transition: color 0.2s ease, text-shadow 0.2s ease;
+  padding: 6px 0 2px;
+  letter-spacing: 2px;
+  transition: color 0.15s ease, text-shadow 0.15s ease;
   user-select: none;
 }
 
@@ -895,35 +895,81 @@ html, body {
   box-shadow: 0 0 14px rgba(168,85,247,0.3);
 }
 
-/* ─── Barra de confianza ─── */
-.espejo-confianza-wrap {
+/* ─── Grid de 2 manos ─── */
+.espejo-hands-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
   width: 100%;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
 }
 
-.espejo-confianza-label {
-  font-family: Arial, sans-serif;
-  font-size: 9.5px;
-  color: rgba(255,255,255,0.35);
-  text-align: right;
-  margin-bottom: 4px;
+.espejo-hand-panel {
+  background: rgba(255,255,255,0.03);
+  border: 1.5px solid rgba(106,13,173,0.3);
+  border-radius: 14px;
+  padding: 10px 8px 8px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.hand-tag {
+  font-family: 'Inter', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+  opacity: 0.9;
+}
+
+/* ─── Display instantáneo de gesto (modo palabras) ─── */
+.espejo-instant-detect {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 10px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.03);
+  border: 1.5px solid rgba(106,13,173,0.25);
+  margin-bottom: 10px;
+  min-height: 62px;
+  transition: all 0.2s ease;
+}
+
+.espejo-instant-detect.active {
+  background: rgba(168,85,247,0.12);
+  border-color: rgba(168,85,247,0.55);
+  box-shadow: 0 0 20px rgba(168,85,247,0.25);
+  animation: instantPop 0.2s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+@keyframes instantPop {
+  from { transform: scale(0.94); }
+  to   { transform: scale(1); }
+}
+
+.instant-emoji {
+  font-size: 30px;
+  line-height: 1;
+}
+
+.instant-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.75);
   letter-spacing: 0.3px;
 }
 
-.espejo-confianza-track {
-  width: 100%;
-  height: 6px;
-  background: rgba(255,255,255,0.07);
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.espejo-confianza-bar {
-  height: 100%;
-  width: 0%;
-  border-radius: 6px;
-  transition: width 0.25s ease, background 0.4s ease;
-  background: linear-gradient(90deg,#3a0070,#6a0dad);
+.espejo-instant-detect.active .instant-label {
+  color: #e9d5ff;
+  text-shadow: 0 0 16px rgba(168,85,247,0.6);
 }
 
 /* ─── Resultado / Feedback ─── */

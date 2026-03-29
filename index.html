@@ -341,34 +341,43 @@
             <video id="espejo-video" autoplay muted playsinline></video>
             <canvas id="espejo-canvas" width="340" height="255"></canvas>
             <div class="espejo-cam-badge">IA Activa</div>
+          </div>
+
+          <div class="espejo-cam-controls">
             <button class="espejo-cam-switch" onclick="espejoToggleCamara()" title="Cambiar Cámara">
-              🔄
+              🔄 Cambiar Cámara
             </button>
           </div>
 
-          <!-- ── Sección: Letras (traductor) ── -->
+          <!-- ── Sección: Letras (2 manos) ── -->
           <div id="espejo-letras-section">
-            <!-- Letra grande detectada -->
-            <div class="espejo-live-letter" id="espejo-live-letter">—</div>
-            <!-- Descripción de la seña -->
-            <div class="espejo-live-desc" id="espejo-live-desc">Muestra tu mano a la cámara</div>
-          </div>
-
-          <!-- ── Sección: Palabras (traductor continuo) ── -->
-          <div id="espejo-palabras-section" class="hidden">
-            <!-- Confianza -->
-            <div class="espejo-confianza-wrap" id="espejo-confianza-wrap" style="margin-top: 0; margin-bottom: 8px;">
-              <div class="espejo-confianza-label" id="espejo-confianza-label">Confianza: 0%</div>
-              <div class="espejo-confianza-track">
-                <div class="espejo-confianza-bar" id="espejo-confianza-bar"></div>
+            <div class="espejo-hands-grid">
+              <!-- Mano 1 (Cian) -->
+              <div class="espejo-hand-panel" style="border-color: rgba(34,211,238,0.35);">
+                <div class="hand-tag" style="color:#22d3ee;">🖐 Mano 1</div>
+                <div class="espejo-live-letter" id="espejo-live-letter-0">—</div>
+                <div class="espejo-live-desc" id="espejo-live-desc-0">Muestra tu mano</div>
+              </div>
+              <!-- Mano 2 (Rosa) -->
+              <div class="espejo-hand-panel" style="border-color: rgba(244,114,182,0.35);">
+                <div class="hand-tag" style="color:#f472b6;">🖐 Mano 2</div>
+                <div class="espejo-live-letter" id="espejo-live-letter-1">—</div>
+                <div class="espejo-live-desc" id="espejo-live-desc-1">Muestra tu mano</div>
               </div>
             </div>
-            <div class="espejo-live-desc" id="espejo-live-phrase-desc">Mantén la seña para agregarla a la frase...</div>
+          </div>
+
+          <!-- ── Sección: Palabras (instantáneo, sin barra de carga) ── -->
+          <div id="espejo-palabras-section" class="hidden">
+            <!-- Detección instantánea -->
+            <div class="espejo-instant-detect" id="espejo-instant-detect">
+              <span class="instant-label">Muestra una seña…</span>
+            </div>
 
             <!-- Caja de Traducción Continua -->
             <div class="espejo-traduccion-box">
               <div class="espejo-texto-acumulado" id="espejo-texto-acumulado">
-                <span class="espejo-placeholder">La traducción aparecerá aquí...</span>
+                <span class="espejo-placeholder">La traducción aparecerá aquí…</span>
               </div>
               <div class="espejo-traduccion-acciones">
                 <button class="espejo-act-btn" onclick="espejoBorrarUltima()" title="Borrar última">⌫ Borrar</button>
