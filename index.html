@@ -323,7 +323,24 @@
           <!-- Encabezado -->
           <div class="screen-header">
             <h1 class="screen-title">🪞 Espejo IA</h1>
-            <p class="inicio-tagline">Traduce lengua de señas en tiempo real</p>
+            <p class="inicio-tagline">Traduce señas en tiempo real con <strong>Boni</strong></p>
+            <p style="font-size: 8px; color: rgba(255,255,255,0.3); margin-top: 4px;">Utiliza Boni la IA de Mario</p>
+          </div>
+
+          <!-- Selector de Idiomas Premium -->
+          <div class="espejo-lang-selector">
+            <button class="lang-btn active" id="lang-lsv" onclick="espejoCambiarLenguaje('lsv')">
+              <span class="lang-flag">🇻🇪</span>
+              <span class="lang-label">LSV</span>
+            </button>
+            <button class="lang-btn" id="lang-lse" onclick="espejoCambiarLenguaje('lse')">
+              <span class="lang-flag">🇪🇸</span>
+              <span class="lang-label">LSE</span>
+            </button>
+            <button class="lang-btn" id="lang-asl" onclick="espejoCambiarLenguaje('asl')">
+              <span class="lang-flag">🇺🇸</span>
+              <span class="lang-label">ASL</span>
+            </button>
           </div>
 
           <!-- Sub-Navegación -->
@@ -336,12 +353,16 @@
             </button>
           </div>
 
-          <!-- Cámara + Canvas -->
+          <!-- Cámara limpia — sin overlay -->
           <div class="espejo-cam-wrap">
             <video id="espejo-video" autoplay muted playsinline></video>
-            <canvas id="espejo-canvas" width="340" height="255"></canvas>
-            <div class="espejo-cam-badge">IA Activa</div>
+            <canvas id="espejo-canvas" width="320" height="240" style="display:none;"></canvas>
+            <div class="espejo-cam-badge">📡 Analizando LSV</div>
           </div>
+
+          <p style="font-size:10px; color:rgba(255,255,255,0.3); text-align:center; margin: 4px 0 8px; font-style:italic;">
+            Apunta la cámara trasera hacia el intérprete o televisor
+          </p>
 
           <div class="espejo-cam-controls">
             <button class="espejo-cam-switch" onclick="espejoToggleCamara()" title="Cambiar Cámara">
@@ -469,6 +490,7 @@
 
   <script src="logistica/app.js"></script>
   <script src="logistica/traductor.js"></script>
+  <script src="logistica/boni_service.js"></script>
   <script src="logistica/espejo.js"></script>
   
   <script>

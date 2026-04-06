@@ -1,27 +1,29 @@
 /**
- * MANO APP — Espejo IA v2.3
+ * MANO APP — Espejo IA v2.4
  *
- * Arquitectura:
- *   VIDEO   → elemento <video> a 60fps nativo (sin tocar el canvas)
- *   RENDER  → requestAnimationFrame a 60fps con LERP entre frames de IA
- *   AI LOOP → MediaPipe a ~20fps en segundo plano
+ * VIDEO  → elemento <video> a 60fps nativo
+ * RENDER → RAF a 60fps con LERP entre frames de IA
+ * AI     → MediaPipe a ~30fps (interval 30ms)
  *
- * El LERP hace que el esqueleto se anime suavemente a 60fps aunque la
- * IA solo actualice cada 50ms — sin saltos, sin lag visible.
+ * Sin puntos en el esqueleto → aspecto limpio y profesional
+ * Clasificador de letras mejorado → menos confusiones
  */
 
 /* ══════════════════════════════════════
    CONFIGURACIÓN
 ══════════════════════════════════════ */
 const CFG = {
-  stabilityFrames:  6,
-  movHistoryLen:    28,
-  commitCooldownMs: 1400,
-  minSwingX:        0.055,
-  minSwingY:        0.04,
-  minDirChanges:    3,
-  aiIntervalMs:     50,   // IA a ~20fps
-  lerpMs:           55,   // Duración de transición suave (ms ≥ aiIntervalMs)
+  stabilityFrames:  5,
+  movHistoryLen:    25,
+  commitCooldownMs: 1300,
+  minSwingX:        0.045,  
+  minSwingY:        0.035,
+  minDirChanges:    2,      
+  aiIntervalMs:     30,
+  lerpMs:           35,
+  minHandSize:      0.035,  
+  boneColor:        '#FFD700', // Dorado
+  jointColor:       '#FFFFFF', // Blanco Neutro
 };
 
 /* ══════════════════════════════════════
@@ -31,54 +33,66 @@ let espejoHands      = null;
 let espejoCamera     = null;
 let espejoActivo     = false;
 let espejoModoActual = 'letras';
-let espejoFacingMode = 'user';
+let espejoFacingMode = 'environment'; 
+let espejoLenguaje   = 'lsv'; // lsv, lse, asl
 
-// Canvas (cacheado una vez)
 let _canvas = null;
 let _ctx    = null;
+let _rafId  = null;
 
-// RAF
-let _rafId   = null;
+// Lerp
+let _prevLandmarks   = [];
+let _targetLandmarks = [];
+let _lerpT           = 0;
+let _rafLastTime     = 0;
 
-// Lerp de landmarks (anima el esqueleto entre frames de IA)
-let _prevLandmarks   = [];   // Origen del lerp
-let _targetLandmarks = [];   // Destino del lerp (último frame de IA)
-let _lerpT           = 0;    // ms transcurridos desde el último frame de IA
-let _rafLastTime     = 0;    // Timestamp del último RAF
-
-// Throttle de la IA
+// Throttle IA
 let _lastAITime = 0;
 
-// Buffers de estabilidad por mano
+// Estabilidad y movimiento
 let stabBuffers  = [[], []];
-
-// Historial de muñeca por mano [{x,y}]
 let wristHistory = [[], []];
 
-// Cache del último estado del DOM (evita reescribir sin cambios)
+// Cache DOM
 let _lastLetter  = ['', ''];
 let _lastGesture = '';
 
-// Modo palabras
+// Palabras
 let textoAcumulado = [];
 let lastCommitted  = [null, null];
 let inCooldown     = [false, false];
 
 /* ══════════════════════════════════════
-   DATOS DE LETRAS Y PALABRAS
+   DATOS
 ══════════════════════════════════════ */
 const LETRAS_INFO = {
-  'A':'Puño, pulgar al lado',      'B':'Cuatro dedos arriba',
-  'C':'Forma de C',                'D':'Índice arriba, pulgar al medio',
-  'E':'Dedos curvados a la palma', 'F':'Pulgar e índice se tocan',
-  'G':'Índice y pulgar laterales', 'H':'Índice y medio horizontales',
-  'I':'Solo meñique arriba',       'K':'Índice, medio y pulgar',
-  'L':'Pulgar e índice en L',      'M':'Pulgar bajo tres dedos',
-  'N':'Pulgar bajo dos dedos',     'O':'Todos forman una O',
-  'R':'Índice y medio cruzados',   'S':'Puño, pulgar encima',
-  'T':'Pulgar entre dedos',        'U':'Índice y medio juntos',
-  'V':'Índice y medio en V',       'W':'Tres dedos separados',
-  'Y':'Pulgar y meñique',
+  lsv: {
+    'A':'Puño, pulgar al lado',      'B':'Cuatro dedos arriba',
+    'C':'Mano en arco (C)',          'D':'Índice arriba, pulgar al medio',
+    'E':'Dedos curvados a la palma', 'F':'Pulgar e índice se tocan',
+    'G':'Índice y pulgar laterales', 'H':'Índice y medio horizontales',
+    'I':'Solo meñique arriba',       'L':'Pulgar e índice en L',
+    'M':'Pulgar bajo tres dedos',    'N':'Pulgar bajo dos dedos',
+    'O':'Todos forman una O',        'R':'Índice y medio cruzados',
+    'S':'Puño, pulgar encima',       'T':'Pulgar entre dedos',
+    'U':'Índice y medio juntos',     'V':'Índice y medio en V',
+    'W':'Tres dedos separados',      'Y':'Pulgar y meñique',
+  },
+  lse: {
+    // Muy parecido a LSV pero con algunas variantes específicas
+    'A':'Puño (España)', 'B':'Mano abierta', 'C':'Arco', 'D':'Índice arriba',
+    'E':'Garra', 'F':'OK', 'G':'Pistola', 'H':'Dos dedos', 'I':'Meñique',
+    'L':'L', 'M':'M', 'N':'N', 'O':'O', 'P':'K abajo', 'Q':'G abajo',
+    'R':'Cruzados', 'S':'S', 'T':'T', 'U':'U', 'V':'V', 'W':'W', 'X':'Gancho', 'Y':'Y', 'Z':'Z'
+  },
+  asl: {
+    'A':'Fist, thumb side', 'B':'Flat hand', 'C':'Curve', 'D':'Index up',
+    'E':'Clawed fingers', 'F':'OK sign', 'G':'Parallel pinch', 'H':'Two fingers',
+    'I':'Pinky up', 'J':'Pinky J trace', 'K':'V with thumb center', 'L':'L shape',
+    'M':'Under 3 fingers', 'N':'Under 2 fingers', 'O':'O shape', 'P':'K down',
+    'Q':'G down', 'R':'Crossed', 'S':'Fist, thumb over', 'T':'Thumb in',
+    'U':'U shape', 'V':'V shape', 'W':'W shape', 'X':'Hook', 'Y':'Thumb & Pinky'
+  }
 };
 
 const PALABRAS_INFO = {
@@ -95,9 +109,13 @@ const PALABRAS_INFO = {
   'ok':        { texto:'OK / Todo bien', emoji:'👌' },
   'usted':     { texto:'Usted / Tú',     emoji:'👉' },
   'comoestas': { texto:'¿Cómo estás?',   emoji:'🤔' },
+  'comer':     { texto:'Comer',          emoji:'🍔' },
+  'jugar':     { texto:'Jugar',          emoji:'🎮' },
+  'calma':     { texto:'Calma / Espera', emoji:'🖐' },
+  'nose':      { texto:'No sé',          emoji:'🤷‍♂️' },
 };
 
-const HAND_COLORS = ['#22d3ee', '#f472b6'];
+// Eliminado HAND_COLORS ya que ahora se usa CFG.boneColor/jointColor
 
 /* ══════════════════════════════════════
    INICIALIZACIÓN
@@ -112,31 +130,31 @@ function initEspejo() {
   }
 
   _canvas = document.getElementById('espejo-canvas');
-  _ctx    = _canvas
-    ? _canvas.getContext('2d', { willReadFrequently: false })
-    : null;
+  _ctx    = _canvas ? _canvas.getContext('2d', { willReadFrequently: false }) : null;
 
   const video = document.getElementById('espejo-video');
   if (!video || !_ctx) return;
 
-  // Mostrar video directamente (nativo, sin dibujarlo al canvas)
   video.style.opacity   = '1';
   video.style.transform = espejoFacingMode === 'user' ? 'scaleX(-1)' : 'none';
-  _canvas.style.background = 'transparent';
+  // Canvas visible para el esqueleto
+  _canvas.style.display = 'block';
+  if (_canvas) {
+    _canvas.width = video.videoWidth || 320;
+    _canvas.height = video.videoHeight || 240;
+  }
 
-  // MediaPipe Hands
   espejoHands = new Hands({
     locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`,
   });
   espejoHands.setOptions({
     maxNumHands:            2,
-    modelComplexity:        0,    // Lite: 2x más rápido
-    minDetectionConfidence: 0.7,
-    minTrackingConfidence:  0.55,
+    modelComplexity:        0,
+    minDetectionConfidence: 0.72,
+    minTrackingConfidence:  0.6,
   });
   espejoHands.onResults(onEspejoResults);
 
-  // Camera utility (maneja el stream, NO el canvas)
   espejoCamera = new Camera(video, {
     onFrame: async () => {
       if (!espejoActivo || !espejoHands) return;
@@ -155,8 +173,7 @@ function initEspejo() {
 }
 
 /* ══════════════════════════════════════
-   RENDER LOOP — 60fps con LERP
-   El esqueleto se anima suavemente aunque la IA vaya a 20fps
+   RENDER LOOP con LERP — 60fps
 ══════════════════════════════════════ */
 function _startRenderLoop() {
   if (_rafId) cancelAnimationFrame(_rafId);
@@ -165,20 +182,16 @@ function _startRenderLoop() {
   function loop(ts) {
     if (!espejoActivo || !_ctx || !_canvas) return;
 
-    // Avanzar el tiempo del lerp con el delta real entre frames
     const dt = ts - _rafLastTime;
     _rafLastTime = ts;
     _lerpT = Math.min(_lerpT + dt, CFG.lerpMs);
-
-    // t = 0 → posición anterior,  t = 1 → posición de la IA
-    const t = CFG.lerpMs > 0 ? _lerpT / CFG.lerpMs : 1;
+    const t = _lerpT / CFG.lerpMs;
 
     _ctx.clearRect(0, 0, _canvas.width, _canvas.height);
 
-    // Dibujar esqueleto interpolado (suave a 60fps)
     const display = _lerpLandmarks(_prevLandmarks, _targetLandmarks, t);
     display.forEach((lm, hi) => {
-      if (hi < 2) drawHand(_ctx, _canvas, lm, HAND_COLORS[hi]);
+      if (hi < 2) drawHand(_ctx, _canvas, lm);
     });
 
     _rafId = requestAnimationFrame(loop);
@@ -187,10 +200,10 @@ function _startRenderLoop() {
   _rafId = requestAnimationFrame(loop);
 }
 
-/* ── Interpolación lineal entre dos conjuntos de landmarks ── */
+/* ── Interpolación lineal de landmarks ── */
 function _lerpLandmarks(prev, target, t) {
   if (!target || target.length === 0) return [];
-  if (!prev   || prev.length === 0 || prev.length !== target.length) return target;
+  if (!prev || prev.length === 0 || prev.length !== target.length) return target;
   if (t >= 1) return target;
 
   return target.map((tHand, hi) => {
@@ -202,7 +215,7 @@ function _lerpLandmarks(prev, target, t) {
       return {
         x: pp.x + (tp.x - pp.x) * t,
         y: pp.y + (tp.y - pp.y) * t,
-        z: (pp.z || 0) + ((tp.z || 0) - (pp.z || 0)) * t,
+        z: (pp.z||0) + ((tp.z||0) - (pp.z||0)) * t,
       };
     });
   });
@@ -214,10 +227,8 @@ function _lerpLandmarks(prev, target, t) {
 function espejoToggleCamara() {
   espejoFacingMode = espejoFacingMode === 'user' ? 'environment' : 'user';
   if (!espejoActivo || !espejoCamera) return;
-
   const video = document.getElementById('espejo-video');
   if (video) video.style.transform = espejoFacingMode === 'user' ? 'scaleX(-1)' : 'none';
-
   espejoCamera.stop();
   espejoCamera = new Camera(video, {
     onFrame: async () => {
@@ -241,10 +252,8 @@ function stopEspejo() {
   if (_rafId)       { cancelAnimationFrame(_rafId); _rafId = null; }
   if (espejoCamera) { espejoCamera.stop(); espejoCamera = null; }
   if (espejoHands)  { espejoHands.close(); espejoHands  = null; }
-
   const video = document.getElementById('espejo-video');
   if (video) { video.style.opacity = '0'; video.style.transform = 'none'; }
-
   _prevLandmarks = []; _targetLandmarks = []; _lerpT = 0;
   _canvas = null; _ctx = null;
   stabBuffers = [[], []]; wristHistory = [[], []];
@@ -253,24 +262,23 @@ function stopEspejo() {
 }
 
 function _setStatus(msg) {
-  ['espejo-live-desc-0', 'espejo-live-desc-1'].forEach(id => {
+  ['espejo-live-desc-0','espejo-live-desc-1'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.textContent = msg;
   });
 }
 
 /* ══════════════════════════════════════
-   CALLBACK DE LA IA
-   Solo actualiza datos y DOM — el canvas lo maneja el RAF
+   CALLBACK IA — actualiza datos, NO dibuja
 ══════════════════════════════════════ */
 function onEspejoResults(results) {
   const newLMs = results.multiHandLandmarks || [];
 
-  // Capturar la posición visual ACTUAL como origen del nuevo lerp
-  const curT = CFG.lerpMs > 0 ? Math.min(_lerpT / CFG.lerpMs, 1) : 1;
+  // Capturar posición visual actual como origen del nuevo lerp
+  const curT = Math.min(_lerpT / CFG.lerpMs, 1);
   _prevLandmarks   = _lerpLandmarks(_prevLandmarks, _targetLandmarks, curT);
   _targetLandmarks = newLMs;
-  _lerpT           = 0; // Reiniciar transición
+  _lerpT           = 0;
 
   if (newLMs.length === 0) {
     stabBuffers = [[], []];
@@ -327,12 +335,33 @@ function _processLetraMode(lm, hi) {
     stabBuffers[hi].push(letra);
     if (stabBuffers[hi].length > CFG.stabilityFrames) stabBuffers[hi].shift();
     const buf    = stabBuffers[hi];
-    const stable = buf.length >= 4 && buf.every(l => l === letra);
+    const stable = buf.length >= Math.min(4, CFG.stabilityFrames) && buf.every(l => l === letra);
     if (stable && _lastLetter[hi] !== letra) {
       _lastLetter[hi]      = letra;
       letterEl.textContent = letra;
       letterEl.className   = 'espejo-live-letter detected';
-      descEl.textContent   = LETRAS_INFO[letra] || '';
+      
+      // Lógica específica por lenguaje
+      let desc = (LETRAS_INFO[espejoLenguaje] && LETRAS_INFO[espejoLenguaje][letra]) || '';
+      
+      // Mejora: Detectar Ñ en LSV/LSE si hay movimiento sobre la N
+      const mov = _analyzeMovement(wristHistory[hi]);
+      if ((espejoLenguaje === 'lsv' || espejoLenguaje === 'lse') && letra === 'N' && mov.isWaving) {
+          letra = 'Ñ';
+          desc = 'Letra Ñ (N con movimiento)';
+          letterEl.textContent = 'Ñ';
+      }
+
+      descEl.textContent = desc;
+      
+      // Consultar a Boni si hay confusión o para más info
+      if (Math.random() > 0.8) {
+        Boni.analizarGesto(espejoLenguaje, letra).then(res => {
+          if (res && res !== letra) {
+            console.log("Boni sugiere corrección:", res);
+          }
+        });
+      }
     }
   } else {
     stabBuffers[hi] = [];
@@ -387,45 +416,33 @@ function _updateInstantDisplay(gesto) {
 ══════════════════════════════════════ */
 function _analyzeMovement(history) {
   const len = history.length;
-  if (len < 10) return { isWaving:false, isNodding:false, isShaking:false, movingDown:false };
+  if (len < 8) return { isWaving:false, isNodding:false, isShaking:false, movingDown:false };
 
   const start = Math.max(0, len - CFG.movHistoryLen);
-  let xChanges = 0, lastXDir = 0;
-  let yChanges = 0, lastYDir = 0;
-  let minX = Infinity, maxX = -Infinity;
-  let minY = Infinity, maxY = -Infinity;
+  let xCh = 0, lxd = 0, yCh = 0, lyd = 0;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
   let firstY = null, lastY = null;
 
   for (let i = start; i < len; i++) {
-    const h = history[i];
-    if (!h) continue;
+    const h = history[i]; if (!h) continue;
     if (h.x < minX) minX = h.x; if (h.x > maxX) maxX = h.x;
     if (h.y < minY) minY = h.y; if (h.y > maxY) maxY = h.y;
-    if (firstY === null) firstY = h.y;
-    lastY = h.y;
+    if (firstY === null) firstY = h.y; lastY = h.y;
     if (i > start) {
       const p = history[i-1]; if (!p) continue;
       const dx = h.x - p.x, dy = h.y - p.y;
-      if (Math.abs(dx) > 0.007) {
-        const d = dx > 0 ? 1 : -1;
-        if (lastXDir && d !== lastXDir) xChanges++;
-        lastXDir = d;
-      }
-      if (Math.abs(dy) > 0.007) {
-        const d = dy > 0 ? 1 : -1;
-        if (lastYDir && d !== lastYDir) yChanges++;
-        lastYDir = d;
-      }
+      if (Math.abs(dx) > 0.007) { const d=dx>0?1:-1; if(lxd&&d!==lxd)xCh++; lxd=d; }
+      if (Math.abs(dy) > 0.007) { const d=dy>0?1:-1; if(lyd&&d!==lyd)yCh++; lyd=d; }
     }
   }
 
-  const rangeX = maxX - minX, rangeY = maxY - minY;
+  const rx = maxX-minX, ry = maxY-minY;
   const netY = (lastY !== null && firstY !== null) ? lastY - firstY : 0;
   return {
-    isWaving:   xChanges >= CFG.minDirChanges && rangeX > CFG.minSwingX,
-    isNodding:  yChanges >= CFG.minDirChanges && rangeY > CFG.minSwingY,
-    isShaking:  xChanges >= CFG.minDirChanges && rangeX > CFG.minSwingX,
-    movingDown: netY > 0.07 && yChanges <= 2,
+    isWaving:   xCh >= CFG.minDirChanges && rx > CFG.minSwingX,
+    isNodding:  yCh >= CFG.minDirChanges && ry > CFG.minSwingY,
+    isShaking:  xCh >= CFG.minDirChanges && rx > CFG.minSwingX,
+    movingDown: netY > 0.07 && yCh <= 2,
   };
 }
 
@@ -441,91 +458,152 @@ function _trimHistory() {
    GEOMETRÍA
 ══════════════════════════════════════ */
 function dist(a, b) {
-  const dx = a.x-b.x, dy = a.y-b.y, dz = (a.z||0)-(b.z||0);
+  const dx=a.x-b.x, dy=a.y-b.y, dz=(a.z||0)-(b.z||0);
   return Math.sqrt(dx*dx + dy*dy + dz*dz);
 }
 function hsize(lm) { return dist(lm[0], lm[9]); }
 
 function fingers(lm) {
   const hs = hsize(lm);
+  const tol = hs * 0.12; // Tolerancia dinámica para lenguaje de señas rápido (TV)
   return {
-    P:  dist(lm[4], lm[0]) > dist(lm[2], lm[0]) * 1.12,
-    I:  lm[8].y  < lm[6].y,
-    Me: lm[12].y < lm[10].y,
-    A:  lm[16].y < lm[14].y,
-    Mi: lm[20].y < lm[18].y,
+    P:  dist(lm[4], lm[0]) > dist(lm[2], lm[0]) * 1.05, // Pulgar más indulgente
+    I:  lm[8].y  < lm[6].y + tol,
+    Me: lm[12].y < lm[10].y + tol,
+    A:  lm[16].y < lm[14].y + tol,
+    Mi: lm[20].y < lm[18].y + tol,
     hs,
   };
 }
 
-function touchPI(lm, hs)  { return dist(lm[4], lm[8])  < hs * 0.30; }
-function touchPMe(lm, hs) { return dist(lm[4], lm[12]) < hs * 0.30; }
+function touchPI(lm, hs)  { return dist(lm[4], lm[8])  < hs * 0.28; }
+function touchPMe(lm, hs) { return dist(lm[4], lm[12]) < hs * 0.28; }
 function spreadIM(lm, hs) { return dist(lm[8], lm[12]) / hs; }
 
 function esFormaL(lm) {
-  const pv = { x: lm[4].x-lm[2].x, y: lm[4].y-lm[2].y };
-  const iv = { x: lm[8].x-lm[5].x, y: lm[8].y-lm[5].y };
+  const pv = { x:lm[4].x-lm[2].x, y:lm[4].y-lm[2].y };
+  const iv = { x:lm[8].x-lm[5].x, y:lm[8].y-lm[5].y };
   const dot = pv.x*iv.x + pv.y*iv.y;
   const mag = Math.sqrt(pv.x*pv.x+pv.y*pv.y) * Math.sqrt(iv.x*iv.x+iv.y*iv.y);
   if (!mag) return false;
-  const a = Math.acos(Math.max(-1, Math.min(1, dot/mag))) * 180/Math.PI;
-  return a > 55 && a < 130;
+  const a = Math.acos(Math.max(-1,Math.min(1,dot/mag))) * 180/Math.PI;
+  return a > 60 && a < 120;
 }
+
+/* C mejorada: dedos semi-curvados, brecha clara entre pulgar e índice,
+   puntas de dedos POR ENCIMA de la palma (no es un puño) */
 function esFormaC(lm, hs) {
   hs = hs || hsize(lm);
-  return dist(lm[4], lm[8]) / dist(lm[5], lm[17]) > 0.28;
+  const hw   = dist(lm[5], lm[17]);          // Ancho de la mano
+  const gap  = dist(lm[4], lm[8]) / hw;      // Brecha pulgar-índice relativa
+  const palmY = (lm[5].y + lm[9].y + lm[13].y + lm[17].y) / 4;
+  // Puntas de dedos deben estar por encima del ecuador de la palma
+  const tipsUp = lm[8].y < palmY && lm[12].y < palmY;
+  return gap > 0.40 && gap < 0.95 && tipsUp;
 }
+
+/* O: todas las yemas cerca del pulgar (círculo cerrado) */
 function esFormaO(lm, hs) {
   hs = hs || hsize(lm);
-  const t = hs * 0.38;
-  return dist(lm[4],lm[8]) < t && dist(lm[4],lm[12]) < t*1.3 && dist(lm[4],lm[16]) < t*1.5;
+  const t = hs * 0.35;
+  return dist(lm[4],lm[8]) < t && dist(lm[4],lm[12]) < t*1.2 && dist(lm[4],lm[16]) < t*1.4;
 }
+
+/* E: yemas dobladas, muy cerca del centro de la palma */
 function esPoseE(lm, hs) {
   hs = hs || hsize(lm);
-  const p = lm[9], lim = hs * 0.82;
+  const p = lm[9], lim = hs * 0.75;  // Más estricto que antes
   return dist(lm[8],p)<lim && dist(lm[12],p)<lim && dist(lm[16],p)<lim && dist(lm[20],p)<lim;
 }
-function esPulgarArriba(lm) { return lm[4].y < lm[0].y - 0.05; }
+
+/* S: pulgar cruza POR ENCIMA de todos los dedos (pulgar está entre yemas y palma) */
+function esPoseS(lm, hs) {
+  hs = hs || hsize(lm);
+  // El pulgar está por encima de los PIP (articulación media)
+  return lm[4].y > lm[6].y  &&   // sobre PIP del índice
+         lm[4].y > lm[10].y &&   // sobre PIP del medio
+         lm[4].x > lm[5].x - hs; // y está en la zona central
+}
+
+/* A: puño básico, pulgar al costado (NO sobre los dedos) */
+function esPoseA(lm, hs) {
+  hs = hs || hsize(lm);
+  // El pulgar NO cruza sobre los dedos
+  const thumbOverFist = lm[4].y > lm[6].y && lm[4].y > lm[10].y;
+  return !thumbOverFist;
+}
+
+function esPulgarArriba(lm) { return lm[4].y < lm[0].y - 0.07; }
 function esPulgarAbajo(lm)  { return lm[4].y > lm[0].y + 0.08; }
 
 /* ══════════════════════════════════════
-   CLASIFICADOR DE LETRAS
+   CLASIFICADOR DE LETRAS (v3 — menos confusiones)
 ══════════════════════════════════════ */
 function clasificarLetra(lm) {
-  const { P, I, Me, A, Mi, hs } = fingers(lm);
+  const hs = hsize(lm);
+  // Mano muy pequeña = detectada lejos → no confiable
+  if (hs < CFG.minHandSize) return null;
+
+  const { P, I, Me, A, Mi } = fingers(lm);
   const ext4 = (I?1:0)+(Me?1:0)+(A?1:0)+(Mi?1:0);
-  const tPI = touchPI(lm,hs), tPMe = touchPMe(lm,hs), sIM = spreadIM(lm,hs);
-  const thumbOverFing = lm[4].y > lm[6].y && lm[4].y > lm[10].y;
+  const tPI  = touchPI(lm, hs);
+  const tPMe = touchPMe(lm, hs);
+  const sIM  = spreadIM(lm, hs);
 
-  // Contacto especial
-  if (tPI && Me && A && Mi && !I)    return 'F';
-  if (esFormaO(lm, hs))             return 'O';
-  if (I && !Me && !A && !Mi && tPMe) return 'D';
+  // ── Contactos especiales (alta prioridad) ──
+  if (tPI && Me && A && Mi && !I)     return 'F'; // F: círculo arriba
+  if (esFormaO(lm, hs))              return 'O'; // O: dedos forman círculo
 
-  // 2 dedos: R / U / V
+  // D: índice arriba + pulgar toca el medio
+  if (I && !Me && !A && !Mi && tPMe)  return 'D';
+
+  // ── 2 dedos: R / U / V ──
   if (!P && I && Me && !A && !Mi) {
-    if (sIM < 0.22) return 'R';
-    if (sIM < 0.38) return 'U';
-    return 'V';
+    if (sIM < 0.20) return 'R'; // muy juntos/cruzados
+    if (sIM < 0.36) return 'U'; // juntos
+    return 'V';                  // separados
   }
 
+  // ── 4 dedos ──
   if (!P && I && Me && A && Mi)   return 'B';
-  if (!P && I && Me && A && !Mi)  return 'W';
-  if (P && I && !Me && !A && !Mi) return esFormaL(lm) ? 'L' : 'G';
-  if (P && !I && !Me && !A && Mi) return 'Y';
-  if (!P && I && !Me && !A && !Mi) return 'D';
-  if (!P && !I && !Me && !A && Mi) return 'I'; // FIX: antes inalcanzable
 
+  // ── 3 dedos ──
+  if (!P && I && Me && A && !Mi)  return 'W';
+
+  // ── Pulgar + Índice ──
+  if (P && I && !Me && !A && !Mi) return esFormaL(lm) ? 'L' : 'G';
+
+  // ── Pulgar + Meñique ──
+  if (P && !I && !Me && !A && Mi) return 'Y';
+
+  // ── Solo índice ──
+  if (!P && I && !Me && !A && !Mi) return 'D';
+
+  // ── Solo meñique ──
+  if (!P && !I && !Me && !A && Mi) return 'I';
+
+  // ── Puño cerrado (ext4 === 0) ──
   if (ext4 === 0) {
-    if (esFormaC(lm, hs))  return 'C'; // FIX: antes después del return 'A'
-    if (esFormaO(lm, hs))  return 'O';
-    if (lm[4].y > lm[6].y && lm[4].y > lm[10].y && lm[4].y > lm[14].y) return 'M';
-    if (lm[4].y > lm[6].y && lm[4].y > lm[10].y && lm[4].y <= lm[14].y) return 'N';
-    if (esPoseE(lm, hs))   return 'E';
-    if (thumbOverFing && P) return 'S';
-    if (lm[4].y < lm[8].y && lm[4].y > lm[5].y) return 'T';
+    // C debe ir ANTES de los puños cerrados porque sus dedos no están del todo arriba
+    if (esFormaC(lm, hs))   return 'C'; // C: arco con dedos semi-curvados
+    if (esFormaO(lm, hs))   return 'O'; // doble check
+
+    // M / N: pulgar debajo de dedos
+    const thumbBelowIdx = lm[4].y > lm[6].y;
+    const thumbBelowMid = lm[4].y > lm[10].y;
+    const thumbBelowRng = lm[4].y > lm[14].y;
+    if (thumbBelowIdx && thumbBelowMid && thumbBelowRng) return 'M';
+    if (thumbBelowIdx && thumbBelowMid && !thumbBelowRng) return 'N';
+
+    // E / S / A — orden importante
+    if (esPoseE(lm, hs))    return 'E'; // E: yemas cerca de la palma
+    if (esPoseS(lm, hs))    return 'S'; // S: pulgar sobre todos los dedos
+    if (lm[4].y < lm[8].y && lm[4].y > lm[5].y) return 'T'; // T: pulgar asoma
+
+    // A: puño con pulgar lateral (default de puño)
     return 'A';
   }
+
   return null;
 }
 
@@ -533,84 +611,119 @@ function clasificarLetra(lm) {
    CLASIFICADOR DE PALABRAS
 ══════════════════════════════════════ */
 function clasificarPalabra(lm, mov) {
-  const { P, I, Me, A, Mi, hs } = fingers(lm);
+  const hs = hsize(lm);
+  if (hs < CFG.minHandSize) return null;
+
+  const { P, I, Me, A, Mi } = fingers(lm);
   const allOpen = I && Me && A && Mi;
   const fist    = !I && !Me && !A && !Mi;
   const idxOnly = !P && I && !Me && !A && !Mi;
+  const yShape  = P && !I && !Me && !A && Mi;
+  const lShape  = P && I && !Me && !A && !Mi;
 
   if (mov) {
     if (allOpen && mov.isWaving)   return 'hola';
     if (fist    && mov.isNodding)  return 'si';
     if (idxOnly && mov.isShaking)  return 'no';
-    if (allOpen && mov.movingDown) return 'gracias';
+    if (yShape  && mov.isShaking)  return 'jugar'; // LSV: ambas Y agitadas
+    if (lShape  && mov.isWaving)   return 'nose';  // LSV: dudar/no saber
+    if (allOpen && mov.movingDown) return 'calma'; // LSV: palmas abajo / relajarse
   }
-  if ( P && !I && !Me && !A && !Mi && esPulgarArriba(lm)) return 'bien';
-  if ( P && !I && !Me && !A && !Mi && esPulgarAbajo(lm))  return 'mal';
-  if ( P && I  && !Me && !A && Mi)                         return 'tequiero';
-  if (!P && I  && Me  && !A && !Mi)                        return 'paz';
-  if ( P && !I && !Me && !A && Mi)                         return 'llamar';
-  if (!I && Me && A   && Mi && touchPI(lm, hs))            return 'ok';
-  if (idxOnly)                                             return 'usted';
-  if (!I && !Me && !A && !Mi && esFormaC(lm, hs))         return 'comoestas';
+  
+  // ── Estáticos ──
+  if (esFormaO(lm, hs))                                      return 'comer'; // Agrupar dedos (O plana) hacia la boca
+  if ( P && !I && !Me && !A && !Mi && esPulgarArriba(lm))    return 'bien';
+  if ( P && !I && !Me && !A && !Mi && esPulgarAbajo(lm))     return 'mal';
+  if ( P && I  && !Me && !A && Mi)                           return 'tequiero';
+  if (!P && I  && Me  && !A && !Mi)                          return 'paz';
+  if ( P && !I && !Me && !A && Mi)                           return 'llamar';
+  if (!I && Me && A   && Mi && touchPI(lm,hs))               return 'ok';
+  if (idxOnly)                                               return 'usted';
+  if (!I && !Me && !A && !Mi && esFormaC(lm, hs))            return 'comoestas';
   return null;
 }
 
 /* ══════════════════════════════════════
-   DIBUJO DEL ESQUELETO
-   Batch: 1 stroke() para todas las conexiones
+   DIBUJO — Desactivado
+   El canvas está oculto. La IA procesa en segundo plano
+   y muestra el resultado solo en los paneles de texto.
 ══════════════════════════════════════ */
-const HAND_CONNECTIONS = [
-  [0,1],[1,2],[2,3],[3,4],
-  [0,5],[5,6],[6,7],[7,8],
-  [0,9],[9,10],[10,11],[11,12],
-  [0,13],[13,14],[14,15],[15,16],
-  [0,17],[17,18],[18,19],[19,20],
-  [5,9],[9,13],[13,17],[5,17],
-];
+function drawHand(ctx, canvas, lm) {
+  if (!ctx || !lm) return;
+  
+  const connections = [
+    [0, 1, 2, 3, 4],       // Pulgar
+    [0, 5, 6, 7, 8],       // Índice
+    [0, 9, 10, 11, 12],    // Medio
+    [0, 13, 14, 15, 16],   // Anular
+    [0, 17, 18, 19, 20],   // Meñique
+    [5, 9, 13, 17]         // Palma
+  ];
 
-function drawHand(ctx, canvas, lm, color) {
-  const flip = espejoFacingMode === 'user';
-  const W = canvas.width, H = canvas.height;
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = CFG.boneColor;
+  ctx.shadowBlur = 10;
+  ctx.shadowColor = CFG.boneColor;
 
-  // Precomputar los 21 puntos
-  const pts = new Float32Array(42);
-  for (let i = 0; i < 21; i++) {
-    pts[i*2]   = (flip ? 1 - lm[i].x : lm[i].x) * W;
-    pts[i*2+1] = lm[i].y * H;
-  }
-
-  // Un solo stroke para todas las conexiones
-  ctx.beginPath();
-  ctx.strokeStyle = color;
-  ctx.lineWidth   = 2.5;
-  ctx.globalAlpha = 0.9;
-  for (let k = 0; k < HAND_CONNECTIONS.length; k++) {
-    const a = HAND_CONNECTIONS[k][0], b = HAND_CONNECTIONS[k][1];
-    ctx.moveTo(pts[a*2], pts[a*2+1]);
-    ctx.lineTo(pts[b*2], pts[b*2+1]);
-  }
-  ctx.stroke();
-
-  // Puntos
-  ctx.fillStyle   = color;
-  ctx.strokeStyle = 'rgba(255,255,255,0.55)';
-  ctx.lineWidth   = 1;
-  ctx.globalAlpha = 1.0;
-  for (let i = 0; i < 21; i++) {
-    const r = i === 0 ? 6 : i % 4 === 0 ? 5 : 3;
+  connections.forEach(conn => {
     ctx.beginPath();
-    ctx.arc(pts[i*2], pts[i*2+1], r, 0, 6.2832);
-    ctx.fill();
+    for (let i = 0; i < conn.length; i++) {
+      const pt = lm[conn[i]];
+      if (i === 0) ctx.moveTo(pt.x * canvas.width, pt.y * canvas.height);
+      else ctx.lineTo(pt.x * canvas.width, pt.y * canvas.height);
+    }
     ctx.stroke();
-  }
+  });
+
+  // Dibujar puntos
+  ctx.shadowBlur = 15;
+  ctx.shadowColor = CFG.jointColor;
+  lm.forEach(pt => {
+    ctx.fillStyle = CFG.jointColor;
+    ctx.beginPath();
+    ctx.arc(pt.x * canvas.width, pt.y * canvas.height, 4, 0, 2 * Math.PI);
+    ctx.fill();
+    // Borde brillante
+    ctx.strokeStyle = CFG.boneColor;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  });
+  
+  ctx.shadowBlur = 0; // Reset
 }
 
 /* ══════════════════════════════════════
-   UI HELPERS
+   CAMBIAR LENGUAJE
+   LSV (Venezuela), LSE (España), ASL (Inglaterra/EEUU)
+══════════════════════════════════════ */
+function espejoCambiarLenguaje(lang) {
+  espejoLenguaje = lang;
+  
+  // Actualizar UI
+  ['lsv','lse','asl'].forEach(l => {
+    const btn = document.getElementById(`lang-${l}`);
+    if (btn) {
+      btn.classList.toggle('active', l === lang);
+      // Efecto visual premium al cambiar
+      if (l === lang) btn.style.boxShadow = "0 0 25px var(--gold)";
+      else btn.style.boxShadow = "none";
+    }
+  });
+  
+  // Limpiar estados
+  espejoLimpiar();
+  _setStatus(`Boni: Modo ${lang.toUpperCase()} activado`);
+  
+  if (navigator.vibrate) navigator.vibrate([10, 30, 10]);
+}
+
+/* ══════════════════════════════════════
+   UI
 ══════════════════════════════════════ */
 function _showNoHands() {
   if (espejoModoActual === 'letras') {
-    [0, 1].forEach(i => _resetHandPanel(i));
+    [0,1].forEach(i => _resetHandPanel(i));
   } else {
     _updateInstantDisplay(null);
   }
@@ -640,7 +753,7 @@ function espejoBorrarUltima() {
 }
 function espejoLimpiar() {
   textoAcumulado = []; lastCommitted = [null, null];
-  wristHistory   = [[], []]; _lastGesture = '';
+  wristHistory = [[], []]; _lastGesture = '';
   renderTextoAcumulado(); _updateInstantDisplay(null);
 }
 function espejoHablar() {
@@ -662,13 +775,8 @@ function showEspejoMode(mode) {
     if (btn) btn.classList.toggle('active', m === mode);
     if (sec) sec.classList.toggle('hidden', m !== mode);
   });
-  stabBuffers      = [[], []];
-  wristHistory     = [[], []];
-  lastCommitted    = [null, null];
-  inCooldown       = [false, false];
-  _lastLetter      = ['', ''];
-  _lastGesture     = '';
-  _prevLandmarks   = [];
-  _targetLandmarks = [];
-  _lerpT           = 0;
+  stabBuffers = [[], []]; wristHistory = [[], []];
+  lastCommitted = [null, null]; inCooldown = [false, false];
+  _lastLetter = ['', '']; _lastGesture = '';
+  _prevLandmarks = []; _targetLandmarks = []; _lerpT = 0;
 }
