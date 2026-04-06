@@ -13,17 +13,17 @@
    CONFIGURACIÓN
 ══════════════════════════════════════ */
 const CFG = {
-  stabilityFrames:  2,      // Reducido para respuesta instantánea (era 5)
-  movHistoryLen:    15,      // Histogram más corto para gestos rápidos
-  commitCooldownMs: 800,     // Cooldown más corto
+  stabilityFrames:  2,      
+  movHistoryLen:    15,      
+  commitCooldownMs: 800,     
   minSwingX:        0.035,  
   minSwingY:        0.025,
   minDirChanges:    1,      
-  aiIntervalMs:     0,       // Sin throttle, procesar lo más rápido posible
-  lerpMs:           20,      // Menos LAG visual
+  aiIntervalMs:     0,       
+  lerpMs:           20,      
   minHandSize:      0.020,  
-  boneColor:        '#FFD700', 
-  jointColor:       '#FFFFFF', 
+  boneColor:        '#000000', // Negro para las líneas
+  jointColor:       '#FFFFFF', // Blanco para los puntos
 };
 
 /* ══════════════════════════════════════
@@ -34,7 +34,7 @@ let espejoCamera     = null;
 let espejoActivo     = false;
 let espejoModoActual = 'letras';
 let espejoFacingMode = 'environment'; 
-let espejoLenguaje   = 'lsv'; // lsv, lse, asl
+let espejoMirrored   = false; // Estado manual del espejo
 
 let _canvas = null;
 let _ctx    = null;
@@ -66,33 +66,16 @@ let inCooldown     = [false, false];
    DATOS
 ══════════════════════════════════════ */
 const LETRAS_INFO = {
-  lsv: {
-    'A':'Puño, pulgar al lado',      'B':'Cuatro dedos arriba',
-    'C':'Mano en arco (C)',          'D':'Índice arriba, pulgar al medio',
-    'E':'Dedos curvados a la palma', 'F':'Pulgar e índice se tocan',
-    'G':'Índice y pulgar laterales', 'H':'Índice y medio horizontales',
-    'I':'Solo meñique arriba',       'L':'Pulgar e índice en L',
-    'M':'Pulgar bajo tres dedos',    'N':'Pulgar bajo dos dedos',
-    'O':'Todos forman una O',        'R':'Índice y medio cruzados',
-    'S':'Puño, pulgar encima',       'T':'Pulgar entre dedos',
-    'U':'Índice y medio juntos',     'V':'Índice y medio en V',
-    'W':'Tres dedos separados',      'Y':'Pulgar y meñique',
-  },
-  lse: {
-    // Muy parecido a LSV pero con algunas variantes específicas
-    'A':'Puño (España)', 'B':'Mano abierta', 'C':'Arco', 'D':'Índice arriba',
-    'E':'Garra', 'F':'OK', 'G':'Pistola', 'H':'Dos dedos', 'I':'Meñique',
-    'L':'L', 'M':'M', 'N':'N', 'O':'O', 'P':'K abajo', 'Q':'G abajo',
-    'R':'Cruzados', 'S':'S', 'T':'T', 'U':'U', 'V':'V', 'W':'W', 'X':'Gancho', 'Y':'Y', 'Z':'Z'
-  },
-  asl: {
-    'A':'Fist, thumb side', 'B':'Flat hand', 'C':'Curve', 'D':'Index up',
-    'E':'Clawed fingers', 'F':'OK sign', 'G':'Parallel pinch', 'H':'Two fingers',
-    'I':'Pinky up', 'J':'Pinky J trace', 'K':'V with thumb center', 'L':'L shape',
-    'M':'Under 3 fingers', 'N':'Under 2 fingers', 'O':'O shape', 'P':'K down',
-    'Q':'G down', 'R':'Crossed', 'S':'Fist, thumb over', 'T':'Thumb in',
-    'U':'U shape', 'V':'V shape', 'W':'W shape', 'X':'Hook', 'Y':'Thumb & Pinky'
-  }
+  'A':'Puño, pulgar al lado',      'B':'Cuatro dedos arriba',
+  'C':'Mano en arco (C)',          'D':'Índice arriba, pulgar al medio',
+  'E':'Dedos curvados a la palma', 'F':'Pulgar e índice se tocan',
+  'G':'Índice y pulgar laterales', 'H':'Índice y medio horizontales',
+  'I':'Solo meñique arriba',       'L':'Pulgar e índice en L',
+  'M':'Pulgar bajo tres dedos',    'N':'Pulgar bajo dos dedos',
+  'O':'Todos forman una O',        'R':'Índice y medio cruzados',
+  'S':'Puño, pulgar encima',       'T':'Pulgar entre dedos',
+  'U':'Índice y medio juntos',     'V':'Índice y medio en V',
+  'W':'Tres dedos separados',      'Y':'Pulgar y meñique',
 };
 
 const PALABRAS_INFO = {
@@ -136,8 +119,7 @@ function initEspejo() {
   if (!video || !_ctx) return;
 
   video.style.opacity   = '1';
-  video.style.transform = espejoFacingMode === 'user' ? 'scaleX(-1)' : 'none';
-  // Canvas visible para el esqueleto
+  // El transform ahora se gestiona manualmente con espejoToggleMirror
   _canvas.style.display = 'block';
   if (_canvas) {
     _canvas.width = video.videoWidth || 320;
@@ -148,9 +130,9 @@ function initEspejo() {
     locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`,
   });
   espejoHands.setOptions({
-    maxNumHands:            2,
+    maxNumHands:            1, // Solo una mano para evitar ruidos
     modelComplexity:        0,
-    minDetectionConfidence: 0.5, // Más agresivo para detectar la mano rápido (era 0.72)
+    minDetectionConfidence: 0.5, 
     minTrackingConfidence:  0.5, 
   });
   espejoHands.onResults(onEspejoResults);
@@ -228,7 +210,11 @@ function espejoToggleCamara() {
   espejoFacingMode = espejoFacingMode === 'user' ? 'environment' : 'user';
   if (!espejoActivo || !espejoCamera) return;
   const video = document.getElementById('espejo-video');
-  if (video) video.style.transform = espejoFacingMode === 'user' ? 'scaleX(-1)' : 'none';
+  const canvas = document.getElementById('espejo-canvas');
+  // Mantener el mirror actual al cambiar de cámara
+  const transform = espejoMirrored ? 'scaleX(-1)' : 'none';
+  if (video) video.style.transform = transform;
+  if (canvas) canvas.style.transform = transform;
   espejoCamera.stop();
   espejoCamera = new Camera(video, {
     onFrame: async () => {
@@ -343,11 +329,11 @@ function _processLetraMode(lm, hi) {
       letterEl.className   = 'espejo-live-letter detected';
       
       // Lógica específica por lenguaje
-      let desc = (LETRAS_INFO[espejoLenguaje] && LETRAS_INFO[espejoLenguaje][letra]) || '';
+      let desc = LETRAS_INFO[letra] || '';
       
-      // Mejora: Detectar Ñ en LSV/LSE si hay movimiento sobre la N
+      // Mejora: Detectar Ñ en LSV si hay movimiento sobre la N
       const mov = _analyzeMovement(wristHistory[hi]);
-      if ((espejoLenguaje === 'lsv' || espejoLenguaje === 'lse') && letra === 'N' && mov.isWaving) {
+      if (letra === 'N' && mov.isWaving) {
           letra = 'Ñ';
           desc = 'Letra Ñ (N con movimiento)';
           letterEl.textContent = 'Ñ';
@@ -357,7 +343,7 @@ function _processLetraMode(lm, hi) {
       
       // Consultar a Boni si hay confusión o para más info
       if (Math.random() > 0.8) {
-        Boni.analizarGesto(espejoLenguaje, letra).then(res => {
+        Boni.analizarGesto('lsv', letra).then(res => {
           if (res && res !== letra) {
             console.log("Boni sugiere corrección:", res);
           }
@@ -697,11 +683,10 @@ function drawHand(ctx, canvas, lm) {
     [5, 9, 13, 17]         // Palma
   ];
 
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 1.5; // MUCHO MÁS FINO
   ctx.lineCap = 'round';
   ctx.strokeStyle = CFG.boneColor;
-  ctx.shadowBlur = 10;
-  ctx.shadowColor = CFG.boneColor;
+  ctx.shadowBlur = 0; // SIN NEÓN
 
   connections.forEach(conn => {
     ctx.beginPath();
@@ -714,45 +699,33 @@ function drawHand(ctx, canvas, lm) {
   });
 
   // Dibujar puntos
-  ctx.shadowBlur = 15;
-  ctx.shadowColor = CFG.jointColor;
   lm.forEach(pt => {
     ctx.fillStyle = CFG.jointColor;
     ctx.beginPath();
-    ctx.arc(pt.x * canvas.width, pt.y * canvas.height, 4, 0, 2 * Math.PI);
+    ctx.arc(pt.x * canvas.width, pt.y * canvas.height, 2.5, 0, 2 * Math.PI); // PUNTOS MÁS PEQUEÑOS
     ctx.fill();
-    // Borde brillante
-    ctx.strokeStyle = CFG.boneColor;
-    ctx.lineWidth = 1;
+    // Borde negro para que resalten
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 0.5;
     ctx.stroke();
   });
-  
-  ctx.shadowBlur = 0; // Reset
 }
 
 /* ══════════════════════════════════════
-   CAMBIAR LENGUAJE
-   LSV (Venezuela), LSE (España), ASL (Inglaterra/EEUU)
+   VOLTEAR ESPEJO (MIRROR)
 ══════════════════════════════════════ */
-function espejoCambiarLenguaje(lang) {
-  espejoLenguaje = lang;
+function espejoToggleMirror() {
+  espejoMirrored = !espejoMirrored;
   
-  // Actualizar UI
-  ['lsv','lse','asl'].forEach(l => {
-    const btn = document.getElementById(`lang-${l}`);
-    if (btn) {
-      btn.classList.toggle('active', l === lang);
-      // Efecto visual premium al cambiar
-      if (l === lang) btn.style.boxShadow = "0 0 25px var(--gold)";
-      else btn.style.boxShadow = "none";
-    }
-  });
+  const video = document.getElementById('espejo-video');
+  const canvas = document.getElementById('espejo-canvas');
   
-  // Limpiar estados
-  espejoLimpiar();
-  _setStatus(`Boni: Modo ${lang.toUpperCase()} activado`);
-  
-  if (navigator.vibrate) navigator.vibrate([10, 30, 10]);
+  if (video && canvas) {
+    const transform = espejoMirrored ? 'scaleX(-1)' : 'none';
+    video.style.transform = transform;
+    canvas.style.transform = transform;
+    _setStatus(espejoMirrored ? 'Modo Espejo: ACTIVADO' : 'Modo Espejo: DESACTIVADO');
+  }
 }
 
 /* ══════════════════════════════════════
