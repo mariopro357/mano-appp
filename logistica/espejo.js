@@ -400,15 +400,39 @@ function _updateInstantDisplay(gesto) {
   _lastGesture = gesto;
   const el = document.getElementById('espejo-instant-detect');
   if (!el) return;
+  
   if (gesto) {
     const info = PALABRAS_INFO[gesto];
     if (info) {
       el.innerHTML = `<span class="instant-emoji">${info.emoji}</span><span class="instant-label">${info.texto}</span>`;
       el.className = 'espejo-instant-detect active';
+      _updateGuiaVisual(gesto); // Sincronizar guía visual
     }
   } else {
     el.innerHTML = '<span class="instant-label">Muestra una seña…</span>';
     el.className = 'espejo-instant-detect';
+    _updateGuiaVisual(null); // Ocultar guía visual
+  }
+}
+
+/**
+ * Muestra la guía visual de Boni en la izquierda
+ */
+function _updateGuiaVisual(gesto) {
+  const guia = document.getElementById('espejo-guia-visual');
+  const icon = document.getElementById('espejo-guia-icon');
+  const label = document.getElementById('espejo-guia-label');
+  if (!guia || !icon || !label) return;
+
+  if (gesto) {
+    const info = PALABRAS_INFO[gesto];
+    if (info) {
+        icon.textContent = info.emoji;
+        label.textContent = info.texto;
+        guia.classList.add('active');
+    }
+  } else {
+    guia.classList.remove('active');
   }
 }
 
@@ -439,11 +463,16 @@ function _analyzeMovement(history) {
 
   const rx = maxX-minX, ry = maxY-minY;
   const netY = (lastY !== null && firstY !== null) ? lastY - firstY : 0;
+  
+  // Refinamiento: Eje X debe ser mucho mayor que Y para Waving, y viceversa para Calma
+  const dominantX = rx > ry * 1.5;
+  const dominantY = ry > rx * 1.2;
+
   return {
-    isWaving:   xCh >= CFG.minDirChanges && rx > CFG.minSwingX,
-    isNodding:  yCh >= CFG.minDirChanges && ry > CFG.minSwingY,
-    isShaking:  xCh >= CFG.minDirChanges && rx > CFG.minSwingX,
-    movingDown: netY > 0.07 && yCh <= 2,
+    isWaving:   xCh >= CFG.minDirChanges && rx > CFG.minSwingX && dominantX,
+    isNodding:  yCh >= CFG.minDirChanges && ry > CFG.minSwingY && dominantY,
+    isShaking:  xCh >= CFG.minDirChanges && rx > CFG.minSwingX && dominantX,
+    movingDown: netY > 0.07 && yCh <= 2 && dominantY,
   };
 }
 
@@ -623,18 +652,25 @@ function clasificarPalabra(lm, mov) {
   const lShape  = P && I && !Me && !A && !Mi;
 
   if (mov) {
+    // Hola: Mano abierta + Movimiento dominante X (Waving)
     if (allOpen && mov.isWaving)   return 'hola';
+    // Si: Puño + Movimiento dominante Y (Nodding)
     if (fist    && mov.isNodding)  return 'si';
+    // No: Índice solo + Movimiento lateral (Shaking)
     if (idxOnly && mov.isShaking)  return 'no';
-    if (yShape  && mov.isShaking)  return 'jugar'; // LSV: ambas Y agitadas
-    if (lShape  && mov.isWaving)   return 'nose';  // LSV: dudar/no saber
-    if (allOpen && mov.movingDown) return 'calma'; // LSV: palmas abajo / relajarse
+    
+    if (yShape  && mov.isShaking)  return 'jugar'; 
+    if (lShape  && mov.isWaving)   return 'nose';  
+
+    // Calma/Espera: Mano abierta + Movimiento hacia abajo dominante
+    if (allOpen && mov.movingDown) return 'calma'; 
   }
   
   // ── Estáticos ──
-  if (esFormaO(lm, hs))                                      return 'comer'; // Agrupar dedos (O plana) hacia la boca
-  if ( P && !I && !Me && !A && !Mi && esPulgarArriba(lm))    return 'bien';
-  if ( P && !I && !Me && !A && !Mi && esPulgarAbajo(lm))     return 'mal';
+  // Bien: Pulgar arriba (exige que los otros 4 dedos estén cerrados)
+  const otherFingersClosed = !I && !Me && !A && !Mi;
+  if (P && otherFingersClosed && esPulgarArriba(lm)) return 'bien';
+  if (P && otherFingersClosed && esPulgarAbajo(lm))  return 'mal';
   if ( P && I  && !Me && !A && Mi)                           return 'tequiero';
   if (!P && I  && Me  && !A && !Mi)                          return 'paz';
   if ( P && !I && !Me && !A && Mi)                           return 'llamar';
