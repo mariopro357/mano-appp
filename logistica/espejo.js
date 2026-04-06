@@ -13,17 +13,17 @@
    CONFIGURACIÓN
 ══════════════════════════════════════ */
 const CFG = {
-  stabilityFrames:  5,
-  movHistoryLen:    25,
-  commitCooldownMs: 1300,
-  minSwingX:        0.045,  
-  minSwingY:        0.035,
-  minDirChanges:    2,      
-  aiIntervalMs:     30,
-  lerpMs:           35,
-  minHandSize:      0.035,  
-  boneColor:        '#FFD700', // Dorado
-  jointColor:       '#FFFFFF', // Blanco Neutro
+  stabilityFrames:  2,      // Reducido para respuesta instantánea (era 5)
+  movHistoryLen:    15,      // Histogram más corto para gestos rápidos
+  commitCooldownMs: 800,     // Cooldown más corto
+  minSwingX:        0.035,  
+  minSwingY:        0.025,
+  minDirChanges:    1,      
+  aiIntervalMs:     0,       // Sin throttle, procesar lo más rápido posible
+  lerpMs:           20,      // Menos LAG visual
+  minHandSize:      0.020,  
+  boneColor:        '#FFD700', 
+  jointColor:       '#FFFFFF', 
 };
 
 /* ══════════════════════════════════════
@@ -150,8 +150,8 @@ function initEspejo() {
   espejoHands.setOptions({
     maxNumHands:            2,
     modelComplexity:        0,
-    minDetectionConfidence: 0.72,
-    minTrackingConfidence:  0.6,
+    minDetectionConfidence: 0.5, // Más agresivo para detectar la mano rápido (era 0.72)
+    minTrackingConfidence:  0.5, 
   });
   espejoHands.onResults(onEspejoResults);
 
@@ -335,7 +335,8 @@ function _processLetraMode(lm, hi) {
     stabBuffers[hi].push(letra);
     if (stabBuffers[hi].length > CFG.stabilityFrames) stabBuffers[hi].shift();
     const buf    = stabBuffers[hi];
-    const stable = buf.length >= Math.min(4, CFG.stabilityFrames) && buf.every(l => l === letra);
+    // Respuesta inmediata: basta con 2 frames iguales
+    const stable = buf.length >= CFG.stabilityFrames && buf.every(l => l === letra);
     if (stable && _lastLetter[hi] !== letra) {
       _lastLetter[hi]      = letra;
       letterEl.textContent = letra;
