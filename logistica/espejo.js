@@ -1,29 +1,29 @@
 /**
- * MANO APP — Espejo IA v2.4
+ * MANO APP — Espejo IA v3.0
  *
  * VIDEO  → elemento <video> a 60fps nativo
  * RENDER → RAF a 60fps con LERP entre frames de IA
- * AI     → MediaPipe a ~30fps (interval 30ms)
+ * AI     → MediaPipe a ~30fps (interval 33ms)
  *
- * Sin puntos en el esqueleto → aspecto limpio y profesional
- * Clasificador de letras mejorado → menos confusiones
+ * Canvas siempre oculto → aspecto limpio y profesional
+ * Clasificador de letras v4 → geometría mejorada, menos confusiones
  */
 
 /* ══════════════════════════════════════
    CONFIGURACIÓN
 ══════════════════════════════════════ */
 const CFG = {
-  stabilityFrames:  2,      
-  movHistoryLen:    15,      
-  commitCooldownMs: 800,     
-  minSwingX:        0.035,  
+  stabilityFrames:  3,       // 3 frames para confirmar (menos parpadeo)
+  movHistoryLen:    15,
+  commitCooldownMs: 800,
+  minSwingX:        0.035,
   minSwingY:        0.025,
-  minDirChanges:    1,      
-  aiIntervalMs:     0,       
-  lerpMs:           20,      
-  minHandSize:      0.020,  
-  boneColor:        '#000000', // Negro para las líneas
-  jointColor:       '#FFFFFF', // Blanco para los puntos
+  minDirChanges:    1,
+  aiIntervalMs:     33,      // máximo ~30 análisis/segundo (sin saturar hilo)
+  lerpMs:           40,      // movimiento más fluido
+  minHandSize:      0.045,   // más estricto: evita detectar cuerpo/ropa
+  boneColor:        '#000000',
+  jointColor:       '#FFFFFF',
 };
 
 /* ══════════════════════════════════════
@@ -33,8 +33,8 @@ let espejoHands      = null;
 let espejoCamera     = null;
 let espejoActivo     = false;
 let espejoModoActual = 'letras';
-let espejoFacingMode = 'environment'; 
-let espejoMirrored   = false; // Estado manual del espejo
+let espejoFacingMode = 'environment';
+let espejoMirrored   = false;
 
 let _canvas = null;
 let _ctx    = null;
@@ -66,16 +66,17 @@ let inCooldown     = [false, false];
    DATOS
 ══════════════════════════════════════ */
 const LETRAS_INFO = {
-  'A':'Puño, pulgar al lado',      'B':'Cuatro dedos arriba',
-  'C':'Mano en arco (C)',          'D':'Índice arriba, pulgar al medio',
-  'E':'Dedos curvados a la palma', 'F':'Pulgar e índice se tocan',
-  'G':'Índice y pulgar laterales', 'H':'Índice y medio horizontales',
-  'I':'Solo meñique arriba',       'L':'Pulgar e índice en L',
-  'M':'Pulgar bajo tres dedos',    'N':'Pulgar bajo dos dedos',
-  'O':'Todos forman una O',        'R':'Índice y medio cruzados',
-  'S':'Puño, pulgar encima',       'T':'Pulgar entre dedos',
-  'U':'Índice y medio juntos',     'V':'Índice y medio en V',
-  'W':'Tres dedos separados',      'Y':'Pulgar y meñique',
+  'A':'Puño, pulgar al costado',      'B':'Cuatro dedos arriba',
+  'C':'Mano en arco (C)',              'D':'Índice arriba, pulgar al medio',
+  'E':'Dedos curvados a la palma',     'F':'Pulgar e índice se tocan',
+  'G':'Índice y pulgar laterales',     'H':'Índice y medio horizontales',
+  'I':'Solo meñique arriba',           'L':'Pulgar e índice en L',
+  'M':'Pulgar bajo tres dedos',        'N':'Pulgar bajo dos dedos',
+  'O':'Todos forman una O',            'R':'Índice y medio cruzados',
+  'S':'Puño, pulgar encima',           'T':'Pulgar entre índice y medio',
+  'U':'Índice y medio juntos',         'V':'Índice y medio en V',
+  'W':'Tres dedos separados',          'Y':'Pulgar y meñique',
+  'Ñ':'N con movimiento lateral',
 };
 
 const PALABRAS_INFO = {
@@ -98,8 +99,6 @@ const PALABRAS_INFO = {
   'nose':      { texto:'No sé',          emoji:'🤷‍♂️' },
 };
 
-// Eliminado HAND_COLORS ya que ahora se usa CFG.boneColor/jointColor
-
 /* ══════════════════════════════════════
    INICIALIZACIÓN
 ══════════════════════════════════════ */
@@ -119,21 +118,17 @@ function initEspejo() {
   if (!video || !_ctx) return;
 
   video.style.opacity   = '1';
-  // El transform ahora se gestiona manualmente con espejoToggleMirror
-  _canvas.style.display = 'block';
-  if (_canvas) {
-    _canvas.width = video.videoWidth || 320;
-    _canvas.height = video.videoHeight || 240;
-  }
+  // Canvas siempre oculto — el análisis ocurre en segundo plano
+  _canvas.style.display = 'none';
 
   espejoHands = new Hands({
     locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`,
   });
   espejoHands.setOptions({
-    maxNumHands:            1, // Solo una mano para evitar ruidos
-    modelComplexity:        0,
-    minDetectionConfidence: 0.5, 
-    minTrackingConfidence:  0.5, 
+    maxNumHands:            2,    // Soporte para 2 manos en modo letras
+    modelComplexity:        1,    // Mayor precisión
+    minDetectionConfidence: 0.65, // Más estricto (evita falsos positivos con poca luz)
+    minTrackingConfidence:  0.60,
   });
   espejoHands.onResults(onEspejoResults);
 
@@ -143,11 +138,29 @@ function initEspejo() {
       const now = performance.now();
       if (now - _lastAITime < CFG.aiIntervalMs) return;
       _lastAITime = now;
-      await espejoHands.send({ image: video });
+      
+      // PRE-PROCESAMIENTO DE IMAGEN PARA POCA LUZ
+      // Aumentamos brillo y contraste a través del canvas antes de enviar a MediaPipe
+      if (_canvas && _ctx) {
+        _ctx.filter = 'brightness(1.3) contrast(1.15)';
+        _ctx.drawImage(video, 0, 0, _canvas.width, _canvas.height);
+        _ctx.filter = 'none'; // reset
+        await espejoHands.send({ image: _canvas });
+      } else {
+        await espejoHands.send({ image: video });
+      }
     },
-    width: 320, height: 240,
+    width: 640, height: 480,   // Mayor resolución → mejor detección
     facingMode: espejoFacingMode,
   });
+
+  // Ajustar canvas al tamaño del video
+  video.addEventListener('loadedmetadata', () => {
+    if (_canvas) {
+      _canvas.width  = video.videoWidth  || 640;
+      _canvas.height = video.videoHeight || 480;
+    }
+  }, { once: true });
 
   espejoCamera.start();
   espejoActivo = true;
@@ -162,19 +175,11 @@ function _startRenderLoop() {
   _rafLastTime = performance.now();
 
   function loop(ts) {
-    if (!espejoActivo || !_ctx || !_canvas) return;
+    if (!espejoActivo) return;
 
     const dt = ts - _rafLastTime;
     _rafLastTime = ts;
     _lerpT = Math.min(_lerpT + dt, CFG.lerpMs);
-    const t = _lerpT / CFG.lerpMs;
-
-    _ctx.clearRect(0, 0, _canvas.width, _canvas.height);
-
-    const display = _lerpLandmarks(_prevLandmarks, _targetLandmarks, t);
-    display.forEach((lm, hi) => {
-      if (hi < 2) drawHand(_ctx, _canvas, lm);
-    });
 
     _rafId = requestAnimationFrame(loop);
   }
@@ -209,11 +214,10 @@ function _lerpLandmarks(prev, target, t) {
 function espejoToggleCamara() {
   espejoFacingMode = espejoFacingMode === 'user' ? 'environment' : 'user';
   if (!espejoActivo || !espejoCamera) return;
-  const video = document.getElementById('espejo-video');
+  const video  = document.getElementById('espejo-video');
   const canvas = document.getElementById('espejo-canvas');
-  // Mantener el mirror actual al cambiar de cámara
   const transform = espejoMirrored ? 'scaleX(-1)' : 'none';
-  if (video) video.style.transform = transform;
+  if (video)  video.style.transform  = transform;
   if (canvas) canvas.style.transform = transform;
   espejoCamera.stop();
   espejoCamera = new Camera(video, {
@@ -222,9 +226,17 @@ function espejoToggleCamara() {
       const now = performance.now();
       if (now - _lastAITime < CFG.aiIntervalMs) return;
       _lastAITime = now;
-      await espejoHands.send({ image: video });
+      
+      if (_canvas && _ctx) {
+        _ctx.filter = 'brightness(1.3) contrast(1.15)';
+        _ctx.drawImage(video, 0, 0, _canvas.width, _canvas.height);
+        _ctx.filter = 'none';
+        await espejoHands.send({ image: _canvas });
+      } else {
+        await espejoHands.send({ image: video });
+      }
     },
-    width: 320, height: 240,
+    width: 640, height: 480,
     facingMode: espejoFacingMode,
   });
   espejoCamera.start();
@@ -281,7 +293,7 @@ function onEspejoResults(results) {
     const mov = _analyzeMovement(wristHistory[hi]);
 
     if (espejoModoActual === 'letras') {
-      _processLetraMode(lm, hi);
+      _processLetraMode(lm, hi, mov);
     } else {
       const g = clasificarPalabra(lm, mov);
       if (g) bestGesto = { gesto: g, hi };
@@ -311,44 +323,33 @@ function onEspejoResults(results) {
 /* ══════════════════════════════════════
    MODO LETRAS
 ══════════════════════════════════════ */
-function _processLetraMode(lm, hi) {
-  const letra    = clasificarLetra(lm);
-  const letterEl = document.getElementById(`espejo-live-letter-${hi}`);
-  const descEl   = document.getElementById(`espejo-live-desc-${hi}`);
+function _processLetraMode(lm, hi, mov) {
+  // FIX: usar letraBase (const) y letraFinal (let) para evitar error de reasignación
+  const letraBase    = clasificarLetra(lm);
+  const letterEl     = document.getElementById(`espejo-live-letter-${hi}`);
+  const descEl       = document.getElementById(`espejo-live-desc-${hi}`);
   if (!letterEl || !descEl) return;
 
-  if (letra) {
-    stabBuffers[hi].push(letra);
+  if (letraBase) {
+    stabBuffers[hi].push(letraBase);
     if (stabBuffers[hi].length > CFG.stabilityFrames) stabBuffers[hi].shift();
     const buf    = stabBuffers[hi];
-    // Respuesta inmediata: basta con 2 frames iguales
-    const stable = buf.length >= CFG.stabilityFrames && buf.every(l => l === letra);
-    if (stable && _lastLetter[hi] !== letra) {
-      _lastLetter[hi]      = letra;
-      letterEl.textContent = letra;
-      letterEl.className   = 'espejo-live-letter detected';
-      
-      // Lógica específica por lenguaje
-      let desc = LETRAS_INFO[letra] || '';
-      
-      // Mejora: Detectar Ñ en LSV si hay movimiento sobre la N
-      const mov = _analyzeMovement(wristHistory[hi]);
-      if (letra === 'N' && mov.isWaving) {
-          letra = 'Ñ';
-          desc = 'Letra Ñ (N con movimiento)';
-          letterEl.textContent = 'Ñ';
+    const stable = buf.length >= CFG.stabilityFrames && buf.every(l => l === letraBase);
+
+    if (stable && _lastLetter[hi] !== letraBase) {
+      // Detectar Ñ: N con movimiento lateral
+      let letraFinal = letraBase;
+      let desc       = LETRAS_INFO[letraBase] || '';
+
+      if (letraBase === 'N' && mov && mov.isWaving) {
+        letraFinal = 'Ñ';
+        desc       = LETRAS_INFO['Ñ'];
       }
 
-      descEl.textContent = desc;
-      
-      // Consultar a Boni si hay confusión o para más info
-      if (Math.random() > 0.8) {
-        Boni.analizarGesto('lsv', letra).then(res => {
-          if (res && res !== letra) {
-            console.log("Boni sugiere corrección:", res);
-          }
-        });
-      }
+      _lastLetter[hi]      = letraFinal;
+      letterEl.textContent = letraFinal;
+      letterEl.className   = 'espejo-live-letter detected';
+      descEl.textContent   = desc;
     }
   } else {
     stabBuffers[hi] = [];
@@ -386,36 +387,33 @@ function _updateInstantDisplay(gesto) {
   _lastGesture = gesto;
   const el = document.getElementById('espejo-instant-detect');
   if (!el) return;
-  
+
   if (gesto) {
     const info = PALABRAS_INFO[gesto];
     if (info) {
       el.innerHTML = `<span class="instant-emoji">${info.emoji}</span><span class="instant-label">${info.texto}</span>`;
       el.className = 'espejo-instant-detect active';
-      _updateGuiaVisual(gesto); // Sincronizar guía visual
+      _updateGuiaVisual(gesto);
     }
   } else {
     el.innerHTML = '<span class="instant-label">Muestra una seña…</span>';
     el.className = 'espejo-instant-detect';
-    _updateGuiaVisual(null); // Ocultar guía visual
+    _updateGuiaVisual(null);
   }
 }
 
-/**
- * Muestra la guía visual de Boni en la izquierda
- */
 function _updateGuiaVisual(gesto) {
-  const guia = document.getElementById('espejo-guia-visual');
-  const icon = document.getElementById('espejo-guia-icon');
+  const guia  = document.getElementById('espejo-guia-visual');
+  const icon  = document.getElementById('espejo-guia-icon');
   const label = document.getElementById('espejo-guia-label');
   if (!guia || !icon || !label) return;
 
   if (gesto) {
     const info = PALABRAS_INFO[gesto];
     if (info) {
-        icon.textContent = info.emoji;
-        label.textContent = info.texto;
-        guia.classList.add('active');
+      icon.textContent  = info.emoji;
+      label.textContent = info.texto;
+      guia.classList.add('active');
     }
   } else {
     guia.classList.remove('active');
@@ -449,8 +447,6 @@ function _analyzeMovement(history) {
 
   const rx = maxX-minX, ry = maxY-minY;
   const netY = (lastY !== null && firstY !== null) ? lastY - firstY : 0;
-  
-  // Refinamiento: Eje X debe ser mucho mayor que Y para Waving, y viceversa para Calma
   const dominantX = rx > ry * 1.5;
   const dominantY = ry > rx * 1.2;
 
@@ -480,11 +476,11 @@ function dist(a, b) {
 function hsize(lm) { return dist(lm[0], lm[9]); }
 
 function fingers(lm) {
-  const hs = hsize(lm);
-  const tol = hs * 0.12; // Tolerancia dinámica para lenguaje de señas rápido (TV)
+  const hs  = hsize(lm);
+  const tol = hs * 0.10;
   return {
-    P:  dist(lm[4], lm[0]) > dist(lm[2], lm[0]) * 1.05, // Pulgar más indulgente
-    I:  lm[8].y  < lm[6].y + tol,
+    P:  dist(lm[4], lm[0]) > dist(lm[2], lm[0]) * 1.05,
+    I:  lm[8].y  < lm[6].y  + tol,
     Me: lm[12].y < lm[10].y + tol,
     A:  lm[16].y < lm[14].y + tol,
     Mi: lm[20].y < lm[18].y + tol,
@@ -506,14 +502,12 @@ function esFormaL(lm) {
   return a > 60 && a < 120;
 }
 
-/* C mejorada: dedos semi-curvados, brecha clara entre pulgar e índice,
-   puntas de dedos POR ENCIMA de la palma (no es un puño) */
+/* C: dedos semi-curvados, brecha clara entre pulgar e índice */
 function esFormaC(lm, hs) {
   hs = hs || hsize(lm);
-  const hw   = dist(lm[5], lm[17]);          // Ancho de la mano
-  const gap  = dist(lm[4], lm[8]) / hw;      // Brecha pulgar-índice relativa
+  const hw   = dist(lm[5], lm[17]);
+  const gap  = dist(lm[4], lm[8]) / hw;
   const palmY = (lm[5].y + lm[9].y + lm[13].y + lm[17].y) / 4;
-  // Puntas de dedos deben estar por encima del ecuador de la palma
   const tipsUp = lm[8].y < palmY && lm[12].y < palmY;
   return gap > 0.40 && gap < 0.95 && tipsUp;
 }
@@ -525,40 +519,103 @@ function esFormaO(lm, hs) {
   return dist(lm[4],lm[8]) < t && dist(lm[4],lm[12]) < t*1.2 && dist(lm[4],lm[16]) < t*1.4;
 }
 
-/* E: yemas dobladas, muy cerca del centro de la palma */
+/* ══════════════════════════════════════
+   POSES DE PUÑO — Geometría mejorada
+══════════════════════════════════════ */
+
+/**
+ * E: yemas de los 4 dedos muy cerca de la palma (dedos curvados hacia adentro)
+ * Umbral más estricto que antes para diferenciarlo de S y A.
+ */
 function esPoseE(lm, hs) {
   hs = hs || hsize(lm);
-  const p = lm[9], lim = hs * 0.75;  // Más estricto que antes
-  return dist(lm[8],p)<lim && dist(lm[12],p)<lim && dist(lm[16],p)<lim && dist(lm[20],p)<lim;
+  const p   = lm[9];
+  const lim = hs * 0.65; // Reducido de 0.75 → más estricto
+  // Además el pulgar debe estar relativamente cerca de los dedos
+  const thumbClose = dist(lm[4], lm[8]) < hs * 0.55;
+  return dist(lm[8],p) < lim && dist(lm[12],p) < lim &&
+         dist(lm[16],p) < lim && dist(lm[20],p) < lim && thumbClose;
 }
 
-/* S: pulgar cruza POR ENCIMA de todos los dedos (pulgar está entre yemas y palma) */
+/**
+ * S: pulgar claramente POR ENCIMA (encima = coordenada Y menor en imagen invertida)
+ * El pulgar cruza el dorso del puño y queda visible encima de los demás dedos.
+ * Usamos diferencia de Y con margen para evitar ambigüedad.
+ */
 function esPoseS(lm, hs) {
   hs = hs || hsize(lm);
-  // El pulgar está por encima de los PIP (articulación media)
-  return lm[4].y > lm[6].y  &&   // sobre PIP del índice
-         lm[4].y > lm[10].y &&   // sobre PIP del medio
-         lm[4].x > lm[5].x - hs; // y está en la zona central
+  const margin = hs * 0.08;
+  // El pulgar (tip=4) debe estar claramente por encima de las articulaciones PIP
+  const overIdx = lm[4].y > lm[6].y  + margin;
+  const overMid = lm[4].y > lm[10].y + margin;
+  // Y debe estar en la zona central X de la mano (no al costado)
+  const inCenter = lm[4].x > lm[5].x - hs * 0.5 && lm[4].x < lm[17].x + hs * 0.5;
+  return overIdx && overMid && inCenter;
 }
 
-/* A: puño básico, pulgar al costado (NO sobre los dedos) */
+/**
+ * A: puño con pulgar claramente al COSTADO de la palma.
+ * El pulgar apunta hacia afuera/lateral, NO encima de los dedos.
+ * Para diferenciarlo de S: el pulgar NO supera los PIP.
+ */
 function esPoseA(lm, hs) {
   hs = hs || hsize(lm);
-  // El pulgar NO cruza sobre los dedos
-  const thumbOverFist = lm[4].y > lm[6].y && lm[4].y > lm[10].y;
-  return !thumbOverFist;
+  const margin = hs * 0.05;
+  // El pulgar NO está encima de los PIP (eso sería S)
+  const notOverIdx = lm[4].y <= lm[6].y  + margin;
+  const notOverMid = lm[4].y <= lm[10].y + margin;
+  // El pulgar está a un lado (X lejos del centro de la palma)
+  const palmCenterX = (lm[5].x + lm[17].x) / 2;
+  const thumbLateral = Math.abs(lm[4].x - palmCenterX) > hs * 0.15;
+  return (notOverIdx || notOverMid) && thumbLateral;
+}
+
+/**
+ * M: pulgar debajo de los 3 primeros dedos (índice, medio, anular) con buen margen
+ * "Debajo" = coordenada Y mayor en la imagen (más abajo en pantalla)
+ */
+function esPoseM(lm, hs) {
+  hs = hs || hsize(lm);
+  const margin = hs * 0.06;
+  return lm[4].y > lm[5].y + margin &&   // debajo de la base del índice
+         lm[4].y > lm[9].y + margin &&   // debajo de la base del medio
+         lm[4].y > lm[13].y + margin;    // debajo de la base del anular
+}
+
+/**
+ * N: pulgar debajo de los 2 primeros dedos (índice y medio) con buen margen
+ * pero NO debajo del anular (eso sería M)
+ */
+function esPoseN(lm, hs) {
+  hs = hs || hsize(lm);
+  const margin = hs * 0.06;
+  return lm[4].y > lm[5].y + margin &&    // debajo de la base del índice
+         lm[4].y > lm[9].y + margin &&    // debajo de la base del medio
+         lm[4].y <= lm[13].y + margin;    // NO debajo del anular
 }
 
 function esPulgarArriba(lm) { return lm[4].y < lm[0].y - 0.07; }
 function esPulgarAbajo(lm)  { return lm[4].y > lm[0].y + 0.08; }
 
+/* Validación de aspect ratio de la mano (filtra detecciones falsas) */
+function esAspectRatioValido(lm) {
+  const ancho = Math.abs(lm[5].x - lm[17].x);
+  const alto  = Math.abs(lm[0].y  - lm[12].y);
+  if (!ancho || !alto) return false;
+  const ratio = ancho / alto;
+  // Una mano real tiene ratio entre 0.3 y 2.5
+  return ratio > 0.3 && ratio < 2.5;
+}
+
 /* ══════════════════════════════════════
-   CLASIFICADOR DE LETRAS (v3 — menos confusiones)
+   CLASIFICADOR DE LETRAS v4 — geometría mejorada
 ══════════════════════════════════════ */
 function clasificarLetra(lm) {
   const hs = hsize(lm);
   // Mano muy pequeña = detectada lejos → no confiable
   if (hs < CFG.minHandSize) return null;
+  // Aspect ratio inválido → probable falso positivo
+  if (!esAspectRatioValido(lm)) return null;
 
   const { P, I, Me, A, Mi } = fingers(lm);
   const ext4 = (I?1:0)+(Me?1:0)+(A?1:0)+(Mi?1:0);
@@ -575,9 +632,9 @@ function clasificarLetra(lm) {
 
   // ── 2 dedos: R / U / V ──
   if (!P && I && Me && !A && !Mi) {
-    if (sIM < 0.20) return 'R'; // muy juntos/cruzados
-    if (sIM < 0.36) return 'U'; // juntos
-    return 'V';                  // separados
+    if (sIM < 0.20) return 'R';
+    if (sIM < 0.36) return 'U';
+    return 'V';
   }
 
   // ── 4 dedos ──
@@ -598,25 +655,28 @@ function clasificarLetra(lm) {
   // ── Solo meñique ──
   if (!P && !I && !Me && !A && Mi) return 'I';
 
+  // ── C: antes de los puños (puede parecer puño si dedos semi-cerrados) ──
+  if (esFormaC(lm, hs)) return 'C';
+
   // ── Puño cerrado (ext4 === 0) ──
   if (ext4 === 0) {
-    // C debe ir ANTES de los puños cerrados porque sus dedos no están del todo arriba
-    if (esFormaC(lm, hs))   return 'C'; // C: arco con dedos semi-curvados
-    if (esFormaO(lm, hs))   return 'O'; // doble check
+    // E primero: yemas muy cerca de la palma (umbral estricto)
+    if (esPoseE(lm, hs)) return 'E';
 
-    // M / N: pulgar debajo de dedos
-    const thumbBelowIdx = lm[4].y > lm[6].y;
-    const thumbBelowMid = lm[4].y > lm[10].y;
-    const thumbBelowRng = lm[4].y > lm[14].y;
-    if (thumbBelowIdx && thumbBelowMid && thumbBelowRng) return 'M';
-    if (thumbBelowIdx && thumbBelowMid && !thumbBelowRng) return 'N';
+    // M y N: pulgar debajo de dedos (orden importa: M antes de N)
+    if (esPoseM(lm, hs)) return 'M';
+    if (esPoseN(lm, hs)) return 'N';
 
-    // E / S / A — orden importante
-    if (esPoseE(lm, hs))    return 'E'; // E: yemas cerca de la palma
-    if (esPoseS(lm, hs))    return 'S'; // S: pulgar sobre todos los dedos
-    if (lm[4].y < lm[8].y && lm[4].y > lm[5].y) return 'T'; // T: pulgar asoma
+    // S: pulgar claramente encima de todos los dedos con margen
+    if (esPoseS(lm, hs)) return 'S';
 
-    // A: puño con pulgar lateral (default de puño)
+    // T: pulgar asoma entre índice y medio
+    if (lm[4].y < lm[8].y && lm[4].y > lm[5].y) return 'T';
+
+    // A: puño con pulgar al costado (default de puño)
+    if (esPoseA(lm, hs)) return 'A';
+
+    // Si llegamos aquí sin clasificar, default A
     return 'A';
   }
 
@@ -624,11 +684,12 @@ function clasificarLetra(lm) {
 }
 
 /* ══════════════════════════════════════
-   CLASIFICADOR DE PALABRAS
+   CLASIFICADOR DE PALABRAS (mejorado)
 ══════════════════════════════════════ */
 function clasificarPalabra(lm, mov) {
   const hs = hsize(lm);
   if (hs < CFG.minHandSize) return null;
+  if (!esAspectRatioValido(lm)) return null;
 
   const { P, I, Me, A, Mi } = fingers(lm);
   const allOpen = I && Me && A && Mi;
@@ -636,79 +697,45 @@ function clasificarPalabra(lm, mov) {
   const idxOnly = !P && I && !Me && !A && !Mi;
   const yShape  = P && !I && !Me && !A && Mi;
   const lShape  = P && I && !Me && !A && !Mi;
+  const tPI     = touchPI(lm, hs);
 
   if (mov) {
-    // Hola: Mano abierta + Movimiento dominante X (Waving)
     if (allOpen && mov.isWaving)   return 'hola';
-    // Si: Puño + Movimiento dominante Y (Nodding)
     if (fist    && mov.isNodding)  return 'si';
-    // No: Índice solo + Movimiento lateral (Shaking)
     if (idxOnly && mov.isShaking)  return 'no';
-    
-    if (yShape  && mov.isShaking)  return 'jugar'; 
-    if (lShape  && mov.isWaving)   return 'nose';  
-
-    // Calma/Espera: Mano abierta + Movimiento hacia abajo dominante
-    if (allOpen && mov.movingDown) return 'calma'; 
+    if (yShape  && mov.isShaking)  return 'jugar';
+    if (lShape  && mov.isWaving)   return 'nose';
+    if (allOpen && mov.movingDown) return 'calma';
   }
-  
+
   // ── Estáticos ──
-  // Bien: Pulgar arriba (exige que los otros 4 dedos estén cerrados)
-  const otherFingersClosed = !I && !Me && !A && !Mi;
-  if (P && otherFingersClosed && esPulgarArriba(lm)) return 'bien';
-  if (P && otherFingersClosed && esPulgarAbajo(lm))  return 'mal';
-  if ( P && I  && !Me && !A && Mi)                           return 'tequiero';
-  if (!P && I  && Me  && !A && !Mi)                          return 'paz';
-  if ( P && !I && !Me && !A && Mi)                           return 'llamar';
-  if (!I && Me && A   && Mi && touchPI(lm,hs))               return 'ok';
-  if (idxOnly)                                               return 'usted';
-  if (!I && !Me && !A && !Mi && esFormaC(lm, hs))            return 'comoestas';
+  const othersClosed = !I && !Me && !A && !Mi;
+
+  // bien vs ok — separación clara:
+  // bien: pulgar SOLO arriba, todos los demás cerrados
+  if (P && othersClosed && esPulgarArriba(lm)) return 'bien';
+  if (P && othersClosed && esPulgarAbajo(lm))  return 'mal';
+
+  // ok: círculo pulgar-índice (touchPI) + medio, anular y meñique EXTENDIDOS
+  if (tPI && !I && Me && A && Mi)  return 'ok';
+
+  if ( P && I  && !Me && !A && Mi)  return 'tequiero';
+  if (!P && I  && Me  && !A && !Mi) return 'paz';
+  if ( P && !I && !Me && !A && Mi)  return 'llamar';
+  if (idxOnly)                       return 'usted';
+  if (fist && esFormaC(lm, hs))     return 'comoestas';
+
   return null;
 }
 
 /* ══════════════════════════════════════
-   DIBUJO — Desactivado
-   El canvas está oculto. La IA procesa en segundo plano
-   y muestra el resultado solo en los paneles de texto.
+   DIBUJO — Canvas siempre oculto
+   La IA procesa en segundo plano y muestra
+   el resultado solo en los paneles de texto.
 ══════════════════════════════════════ */
 function drawHand(ctx, canvas, lm) {
-  if (!ctx || !lm) return;
-  
-  const connections = [
-    [0, 1, 2, 3, 4],       // Pulgar
-    [0, 5, 6, 7, 8],       // Índice
-    [0, 9, 10, 11, 12],    // Medio
-    [0, 13, 14, 15, 16],   // Anular
-    [0, 17, 18, 19, 20],   // Meñique
-    [5, 9, 13, 17]         // Palma
-  ];
-
-  ctx.lineWidth = 1.5; // MUCHO MÁS FINO
-  ctx.lineCap = 'round';
-  ctx.strokeStyle = CFG.boneColor;
-  ctx.shadowBlur = 0; // SIN NEÓN
-
-  connections.forEach(conn => {
-    ctx.beginPath();
-    for (let i = 0; i < conn.length; i++) {
-      const pt = lm[conn[i]];
-      if (i === 0) ctx.moveTo(pt.x * canvas.width, pt.y * canvas.height);
-      else ctx.lineTo(pt.x * canvas.width, pt.y * canvas.height);
-    }
-    ctx.stroke();
-  });
-
-  // Dibujar puntos
-  lm.forEach(pt => {
-    ctx.fillStyle = CFG.jointColor;
-    ctx.beginPath();
-    ctx.arc(pt.x * canvas.width, pt.y * canvas.height, 2.5, 0, 2 * Math.PI); // PUNTOS MÁS PEQUEÑOS
-    ctx.fill();
-    // Borde negro para que resalten
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 0.5;
-    ctx.stroke();
-  });
+  // Función mantenida por compatibilidad pero nunca se llama
+  // (el canvas está display:none)
 }
 
 /* ══════════════════════════════════════
@@ -716,13 +743,13 @@ function drawHand(ctx, canvas, lm) {
 ══════════════════════════════════════ */
 function espejoToggleMirror() {
   espejoMirrored = !espejoMirrored;
-  
-  const video = document.getElementById('espejo-video');
+
+  const video  = document.getElementById('espejo-video');
   const canvas = document.getElementById('espejo-canvas');
-  
+
   if (video && canvas) {
     const transform = espejoMirrored ? 'scaleX(-1)' : 'none';
-    video.style.transform = transform;
+    video.style.transform  = transform;
     canvas.style.transform = transform;
     _setStatus(espejoMirrored ? 'Modo Espejo: ACTIVADO' : 'Modo Espejo: DESACTIVADO');
   }

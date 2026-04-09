@@ -3,7 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Mano App</title>
+  <title>MANO — Traductor de Lengua de Señas Venezolana (LSV) en Tiempo Real</title>
+  <meta name="description" content="MANO es la app gratuita de traducción de Lengua de Señas Venezolana (LSV) en tiempo real. Usa tu cámara para detectar señas con inteligencia artificial. Aprende, practica y comunícate." />
+  <meta name="keywords" content="lengua de señas venezolana, LSV, traductor señas, seña mano, inteligencia artificial, discapacidad auditiva" />
+  <meta name="author" content="MANO App" />
+  <meta property="og:title" content="MANO — Traductor LSV en Tiempo Real" />
+  <meta property="og:description" content="Traduce Lengua de Señas Venezolana en tiempo real con tu cámara." />
+  <meta name="theme-color" content="#6a0dad" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
@@ -323,8 +329,8 @@
           <!-- Encabezado -->
           <div class="screen-header">
             <h1 class="screen-title">🪞 Espejo LSV</h1>
-            <p class="inicio-tagline">Traduce señas venezolanas con <strong>Boni</strong></p>
-            <p style="font-size: 8px; color: rgba(255,255,255,0.3); margin-top: 4px;">IA de Mario especializada en 🇻🇪 Venezuela</p>
+            <p class="inicio-tagline">Traducción de señas venezolanas en tiempo real</p>
+            <p style="font-size: 8px; color: rgba(255,255,255,0.3); margin-top: 4px;">IA local especializada en 🇻🇪 Venezuela — sin internet requerido</p>
           </div>
 
           <!-- Botón de Espejo / Mirror -->
@@ -349,10 +355,10 @@
             <video id="espejo-video" autoplay muted playsinline></video>
             <canvas id="espejo-canvas" width="320" height="240" style="display:none;"></canvas>
             
-            <!-- Guía Visual de Boni -->
+            <!-- Guía Visual -->
             <div id="espejo-guia-visual" class="espejo-guia-visual">
                 <div id="espejo-guia-icon" class="espejo-guia-icon">🤖</div>
-                <div id="espejo-guia-label" class="espejo-guia-label">Boni Guía</div>
+                <div id="espejo-guia-label" class="espejo-guia-label">Guía IA</div>
             </div>
 
             <div class="espejo-cam-badge">📡 Analizando LSV</div>
@@ -488,8 +494,8 @@
 
   <script src="logistica/app.js"></script>
   <script src="logistica/traductor.js"></script>
-  <script src="logistica/boni_service.js"></script>
   <script src="logistica/espejo.js"></script>
+  <!-- boni_service.js eliminado: la IA local de MediaPipe es suficiente y más rápida -->
   
   <script>
     // Función para leer lo que el usuario escribió en la caja de texto
