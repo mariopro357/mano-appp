@@ -162,9 +162,21 @@ function initEspejo() {
     }
   }, { once: true });
 
-  espejoCamera.start();
-  espejoActivo = true;
-  _startRenderLoop();
+  // CHECK DE PROTOCOLO: getUserMedia suele fallar en file:///
+  if (window.location.protocol === 'file:') {
+    _setStatus('⚠️ Error: La cámara no funciona en archivos locales. Abre con Live Server o sube a la web.');
+  } else if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    _setStatus('⚠️ Tu navegador no permite acceso a la cámara o requiere HTTPS.');
+  }
+
+  espejoCamera.start().then(() => {
+    espejoActivo = true;
+    _startRenderLoop();
+    _setStatus('Muestra tu mano');
+  }).catch((err) => {
+    console.error("Error iniciando cámara: ", err);
+    _setStatus('⚠️ Error cámara: Da permisos, revisa la cámara o usa HTTPS/localhost.');
+  });
 }
 
 /* ══════════════════════════════════════
@@ -239,7 +251,10 @@ function espejoToggleCamara() {
     width: 640, height: 480,
     facingMode: espejoFacingMode,
   });
-  espejoCamera.start();
+  espejoCamera.start().catch((err) => {
+    console.error("Error al cambiar cámara: ", err);
+    _setStatus('⚠️ No se pudo cambiar la cámara. Revisa permisos.');
+  });
 }
 
 /* ══════════════════════════════════════
